@@ -1,89 +1,330 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="bn">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>10 Code Store — Sahibul Musa Sium</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Password Protected - Sahibul Musa Sium</title>
   <style>
-    body { font-family: system-ui, Arial; margin:0; padding:20px; background:#f5f7fb; color:#111; }
-    h1 { font-size:22px; margin-bottom:20px; text-align:center; }
-    section.snippet { margin-bottom:30px; background:white; padding:15px; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,0.1);}
-    h2 { margin-top:0; font-size:16px; color:#2563eb; }
-    .subtitle { font-size:13px; color:#555; margin-top:-5px; margin-bottom:10px; font-style:italic; }
-    textarea { width:100%; height:220px; box-sizing:border-box; font-family:"Courier New", monospace; font-size:13px;
-      padding:10px; border-radius:8px; border:1px solid #d7e0ef; background:#fdfdfd; white-space:pre; overflow:auto; resize:vertical; }
-    .controls { margin-top:8px; display:flex; gap:10px; flex-wrap:wrap; }
-    button { padding:8px 12px; border-radius:6px; border:1px solid #ccc; cursor:pointer; }
-    button:hover { background:#f0f0f0; }
-    .btn-blue { background:#2563eb; color:white; border-color:#1e4ed8; }
-    .btn-green { background:#0d9488; color:white; border-color:#0b806f; }
-
-    <!-- Password overlay CSS (paste inside <head>) -->
-  #pw-overlay {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(2,6,23,0.92);
-    z-index: 99999;
-    padding: 20px;
-  }
-  .pw-card {
-    width: 100%;
-    max-width: 460px;
-    background: #071023;
-    padding: 18px;
-    border-radius: 10px;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.6);
-    color: #e6f7ff;
-    border: 1px solid rgba(255,255,255,0.04);
-  }
-  .pw-card h2 { margin:0 0 8px; font-size:18px; color:#7dd3fc; }
-  .pw-card p { margin:0 0 12px; color:#cbd5e1; font-size:14px; }
-  .pw-card input[type="password"]{
-    width:100%;
-    padding:10px;
-    border-radius:8px;
-    border:1px solid rgba(255,255,255,0.06);
-    background: rgba(255,255,255,0.02);
-    color:#fff;
-    font-size:14px;
-    margin-bottom:10px;
-  }
-  .pw-card button{
-    width:100%;
-    padding:10px;
-    border-radius:8px;
-    border:0;
-    background:#06b6d4;
-    color:#022;
-    font-weight:700;
-    cursor:pointer;
-  }
-  .pw-note{ font-size:12px; color:#9ecfff; margin-top:8px; text-align:center; }
-  /* hide overlay when aria-hidden true (for accidental display) */
-  #pw-overlay[aria-hidden="true"]{ display:none; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    body {
+      background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+    
+    .password-container {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 40px;
+      width: 90%;
+      max-width: 450px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      text-align: center;
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      animation: fadeIn 1s ease-out;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .logo {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+      color: #fff;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    }
+    
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+    
+    .subtitle {
+      font-size: 1rem;
+      margin-bottom: 30px;
+      opacity: 0.9;
+    }
+    
+    .input-group {
+      position: relative;
+      margin-bottom: 25px;
+    }
+    
+    .password-input {
+      width: 100%;
+      padding: 15px 20px;
+      border: none;
+      border-radius: 50px;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      font-size: 1rem;
+      outline: none;
+      transition: all 0.3s ease;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    
+    .password-input:focus {
+      background: rgba(255, 255, 255, 0.3);
+      box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+    }
+    
+    .password-input::placeholder {
+      color: rgba(255, 255, 255, 0.7);
+    }
+    
+    .toggle-password {
+      position: absolute;
+      right: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: white;
+      cursor: pointer;
+      font-size: 1.2rem;
+    }
+    
+    .submit-btn {
+      width: 100%;
+      padding: 15px;
+      border: none;
+      border-radius: 50px;
+      background: linear-gradient(135deg, #ff7e5f, #feb47b);
+      color: white;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .submit-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+    }
+    
+    .submit-btn:active {
+      transform: translateY(1px);
+    }
+    
+    .message {
+      margin-top: 20px;
+      padding: 10px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.2);
+      font-size: 0.9rem;
+      display: none;
+    }
+    
+    .hint {
+      margin-top: 20px;
+      font-size: 0.85rem;
+      opacity: 0.7;
+    }
+    
+    .particles {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+    }
+    
+    .particle {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.5);
+      border-radius: 50%;
+      animation: float 15s infinite linear;
+    }
+    
+    @keyframes float {
+      0% {
+        transform: translateY(0) translateX(0) rotate(0deg);
+        opacity: 0;
+      }
+      10% {
+        opacity: 1;
+      }
+      90% {
+        opacity: 1;
+      }
+      100% {
+        transform: translateY(-1000%) translateX(1000%) rotate(720deg);
+        opacity: 0;
+      }
+    }
+    
+    /* Main page styles */
+    .main-container {
+      display: none;
+      width: 100%;
+      min-height: 100vh;
+      background: #f5f7fb;
+      color: #111;
+      padding: 20px;
+    }
+    
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #e1e5eb;
+    }
+    
+    h1 {
+      font-size: 28px;
+      color: #2563eb;
+      margin-bottom: 10px;
+    }
+    
+    .subtitle {
+      color: #555;
+      font-size: 16px;
+    }
+    
+    .snippet {
+      margin-bottom: 30px;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    
+    .snippet h2 {
+      margin-top: 0;
+      font-size: 18px;
+      color: #2563eb;
+    }
+    
+    .snippet .subtitle {
+      font-size: 14px;
+      color: #555;
+      margin-top: -5px;
+      margin-bottom: 15px;
+      font-style: italic;
+    }
+    
+    textarea {
+      width: 100%;
+      height: 220px;
+      box-sizing: border-box;
+      font-family: "Courier New", monospace;
+      font-size: 13px;
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid #d7e0ef;
+      background: #fdfdfd;
+      white-space: pre;
+      overflow: auto;
+      resize: vertical;
+    }
+    
+    .controls {
+      margin-top: 15px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    
+    button {
+      padding: 8px 15px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    
+    button:hover {
+      background: #f0f0f0;
+    }
+    
+    .btn-blue {
+      background: #2563eb;
+      color: white;
+      border-color: #1e4ed8;
+    }
+    
+    .btn-blue:hover {
+      background: #1e4ed8;
+    }
+    
+    .btn-green {
+      background: #0d9488;
+      color: white;
+      border-color: #0b806f;
+    }
+    
+    .btn-green:hover {
+      background: #0b806f;
+    }
+    
+    .logout-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #ef4444;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      z-index: 1000;
+    }
+    
+    .logout-btn:hover {
+      background: #dc2626;
+    }
   </style>
 </head>
 <body>
-  <!-- Password overlay (paste near top of <body>) -->
-<div id="pw-overlay" aria-hidden="false">
-  <div class="pw-card" role="dialog" aria-labelledby="pwTitle">
-    <h2 id="pwTitle">ওয়েবসাইট পাসওয়ার্ড দরকার</h2>
-    <p>সাইটটি দেখতে পাসওয়ার্ড দিন।</p>
-    <input id="pwInput" type="password" placeholder="Password" autocomplete="off" />
-    <button id="pwBtn">Unlock</button>
-    <div class="pw-note">Session পর্যন্ত স্মরণ করা হবে — ট্যাব বন্ধ করলে আবার পাসওয়ার্ড চাইবে।</div>
+  <!-- Password Page -->
+  <div class="password-container" id="passwordPage">
+    <div class="logo">🔒</div>
+    <h1>সুরক্ষিত কোড স্টোর</h1>
+    <p class="subtitle">এই সাইটটি ব্যক্তিগত ব্যবহারের জন্য তৈরি</p>
+    
+    <div class="input-group">
+      <input type="password" class="password-input" id="passwordInput" placeholder="পাসওয়ার্ড দিন" autocomplete="off">
+      <button class="toggle-password" id="togglePassword">👁️</button>
+    </div>
+    
+    <button class="submit-btn" id="submitPassword">প্রবেশ করুন</button>
+    
+    <div class="message" id="message"></div>
+    
+    <p class="hint">পাসওয়ার্ড ভুলে গেছেন? Sahibul Musa Sium-এর সাথে যোগাযোগ করুন</p>
   </div>
-</div>
-  <h1>10 Code Store — Sahibul Musa Sium</h1>
-
-  <!-- Code 1 -->
-  <section class="snippet">
-    <h2>Code 1</h2>
-    <div class="subtitle">Update apscript Code</div>
-    <textarea id="code1" spellcheck="false" wrap="off">/************************************
+  
+  <!-- Main Page -->
+  <div class="main-container" id="mainPage">
+    <button class="logout-btn" id="logoutBtn">লগ আউট</button>
+    
+    <header>
+      <h1>10 Code Store — Sahibul Musa Sium</h1>
+      <p class="subtitle">আপনার সংরক্ষিত কোডসমূহ</p>
+    </header>
+    
+    <!-- Existing Code 1 -->
+    <section class="snippet">
+      <h2>Code 1</h2>
+      <div class="subtitle">Update apscript Code</div>
+      <textarea id="code1" spellcheck="false" wrap="off">/************************************
  * Dakhil-26 (BOM) – Web App API
  * Works with your HTML site's normalizeRow()
  * Author: Sahibul Musa Sium (with ❤️)
@@ -252,20 +493,19 @@ function doGet(e) {
       suggestion: 'Check the header names in your Google Sheet'
     }, 500);
   }
-}
-  </textarea>
-    <div class="controls">
-      <button onclick="selectCode('code1')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code1')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code1')">Download</button>
-    </div>
-  </section>
+}</textarea>
+      <div class="controls">
+        <button onclick="selectCode('code1')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code1')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code1')">Download</button>
+      </div>
+    </section>
 
-  <!-- Code 2 -->
-  <section class="snippet">
-    <h2>Code 2</h2>
-    <div class="subtitle">Old appscript Code</div>
-    <textarea id="code2" spellcheck="false" wrap="off">/************************************
+    <!-- Existing Code 2 -->
+    <section class="snippet">
+      <h2>Code 2</h2>
+      <div class="subtitle">Old appscript Code</div>
+      <textarea id="code2" spellcheck="false" wrap="off">/************************************
  * Dakhil-26 (BOM) – Web App API
  * Works with your HTML site's normalizeRow()
  * Author: Sahibul Musa Sium (with ❤️)
@@ -431,18 +671,18 @@ function doGet(e) {
     }, 500);
   }
 }</textarea>
-    <div class="controls">
-      <button onclick="selectCode('code2')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code2')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code2')">Download</button>
-    </div>
-  </section>
+      <div class="controls">
+        <button onclick="selectCode('code2')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code2')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code2')">Download</button>
+      </div>
+    </section>
 
-  <!-- Code 3 -->
-  <section class="snippet">
-    <h2>Code 3</h2>
-    <div class="subtitle">Update data normalize row Code</div>
-    <textarea id="code3" spellcheck="false" wrap="off">function normalizeRows(rows) {
+    <!-- Existing Code 3 -->
+    <section class="snippet">
+      <h2>Code 3</h2>
+      <div class="subtitle">Update data normalize row Code</div>
+      <textarea id="code3" spellcheck="false" wrap="off">function normalizeRows(rows) {
   try {
     // প্রথমে ক্লাসগুলোকে সাবজেক্ট অনুযায়ী গ্রুপ করা
     const groupedBySubject = rows.reduce((acc, row) => {
@@ -499,18 +739,18 @@ function doGet(e) {
     return [];
   }
 }</textarea>
-    <div class="controls">
-      <button onclick="selectCode('code3')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code3')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code3')">Download</button>
-    </div>
-  </section>
+      <div class="controls">
+        <button onclick="selectCode('code3')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code3')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code3')">Download</button>
+      </div>
+    </section>
 
-  <!-- Code 4 -->
-  <section class="snippet">
-    <h2>Code 4</h2>
-    <div class="subtitle">👉 সাবমিশন Form</div>
-    <textarea id="code4" spellcheck="false" wrap="off">function doPost(e) {
+    <!-- Existing Code 4 -->
+    <section class="snippet">
+      <h2>Code 4</h2>
+      <div class="subtitle">👉 সাবমিশন Form</div>
+      <textarea id="code4" spellcheck="false" wrap="off">function doPost(e) {
   try {
     // প্রথমে raw data দেখাই
     Logger.log("Raw Data: " + e.postData.contents);
@@ -694,18 +934,18 @@ window.addEventListener('click',(e)=>{ if(e.target==$('#formModal')) hideForm();
 </script>
 </body>
 </html></textarea>
-    <div class="controls">
-      <button onclick="selectCode('code4')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code4')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code4')">Download</button>
-    </div>
-  </section>
+      <div class="controls">
+        <button onclick="selectCode('code4')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code4')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code4')">Download</button>
+      </div>
+    </section>
 
-  <!-- Code 5 -->
-  <section class="snippet">
-    <h2>Code 5</h2>
-    <div class="subtitle">👉 ড্যাশবোর্ড </div>
-    <textarea id="code5" spellcheck="false" wrap="off"><!DOCTYPE html>
+    <!-- Existing Code 5 -->
+    <section class="snippet">
+      <h2>Code 5</h2>
+      <div class="subtitle">👉 ড্যাশবোর্ড</div>
+      <textarea id="code5" spellcheck="false" wrap="off"><!DOCTYPE html>
 <html lang="bn">
 <head>
   <meta charset="UTF-8" />
@@ -1571,18 +1811,18 @@ window.addEventListener('click',(e)=>{ if(e.target==$('#formModal')) hideForm();
   </script>
 </body>
     </html></textarea>
-    <div class="controls">
-      <button onclick="selectCode('code5')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code5')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code5')">Download</button>
-    </div>
-  </section>
+      <div class="controls">
+        <button onclick="selectCode('code5')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code5')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code5')">Download</button>
+      </div>
+    </section>
 
-  <!-- Code 6 -->
-  <section class="snippet">
-    <h2>Code 6</h2>
-    <div class="subtitle">👉 pic-Man Cobe</div>
-    <textarea id="code6" spellcheck="false" wrap="off"><!DOCTYPE html>
+    <!-- Existing Code 6 -->
+    <section class="snippet">
+      <h2>Code 6</h2>
+      <div class="subtitle">👉 pic-Man Cobe</div>
+      <textarea id="code6" spellcheck="false" wrap="off"><!DOCTYPE html>
 <html lang="en">
 
   <head>
@@ -1675,69 +1915,280 @@ if (window.location.href.indexOf("fullcpgrid") > -1) {
   
 </html>
 </textarea>
-    <div class="controls">
-      <button onclick="selectCode('code6')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code6')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code6')">Download</button>
-    </div>
-  </section>
+      <div class="controls">
+        <button onclick="selectCode('code6')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code6')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code6')">Download</button>
+      </div>
+    </section>
 
-  <!-- Code 7 -->
-  <section class="snippet">
-    <h2>Code 7</h2>
-    <div class="subtitle">👉 Image Gallery</div>
-    <textarea id="code7" spellcheck="false" wrap="off"><!-- এখানে Code 7 লিখুন --></textarea>
-    <div class="controls">
-      <button onclick="selectCode('code7')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code7')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code7')">Download</button>
-    </div>
-  </section>
+    <!-- Existing Code 7 -->
+    <section class="snippet">
+      <h2>Code 7</h2>
+      <div class="subtitle">👉 Image Gallery</div>
+      <textarea id="code7" spellcheck="false" wrap="off"><!-- এখানে Code 7 লিখুন --></textarea>
+      <div class="controls">
+        <button onclick="selectCode('code7')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code7')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code7')">Download</button>
+      </div>
+    </section>
 
-  <!-- Code 8 -->
-  <section class="snippet">
-    <h2>Code 8</h2>
-    <div class="subtitle">👉 Profile Card</div>
-    <textarea id="code8" spellcheck="false" wrap="off"><!-- এখানে Code 8 লিখুন --></textarea>
-    <div class="controls">
-      <button onclick="selectCode('code8')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code8')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code8')">Download</button>
-    </div>
-  </section>
+    <!-- Existing Code 8 -->
+    <section class="snippet">
+      <h2>Code 8</h2>
+      <div class="subtitle">👉 Profile Card</div>
+      <textarea id="code8" spellcheck="false" wrap="off"><!-- এখানে Code 8 লিখুন --></textarea>
+      <div class="controls">
+        <button onclick="selectCode('code8')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code8')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code8')">Download</button>
+      </div>
+    </section>
 
-  <!-- Code 9 -->
-  <section class="snippet">
-    <h2>Code 9</h2>
-    <div class="subtitle">👉 Footer Section</div>
-    <textarea id="code9" spellcheck="false" wrap="off"><!-- এখানে Code 9 লিখুন --></textarea>
-    <div class="controls">
-      <button onclick="selectCode('code9')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code9')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code9')">Download</button>
-    </div>
-  </section>
+    <!-- Existing Code 9 -->
+    <section class="snippet">
+      <h2>Code 9</h2>
+      <div class="subtitle">👉 Footer Section</div>
+      <textarea id="code9" spellcheck="false" wrap="off"><!-- এখানে Code 9 লিখুন --></textarea>
+      <div class="controls">
+        <button onclick="selectCode('code9')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code9')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code9')">Download</button>
+      </div>
+    </section>
 
-  <!-- Code 10 -->
-  <section class="snippet">
-    <h2>Code 10</h2>
-    <div class="subtitle">👉 Full Page Template</div>
-    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
-    <div class="controls">
-      <button onclick="selectCode('code10')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
-    </div>
-  </section>
+    <!-- Existing Code 10 -->
+    <section class="snippet">
+      <h2>Code 10</h2>
+      <div class="subtitle">👉 Full Page Template</div>
+      <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+      <div class="controls">
+        <button onclick="selectCode('code10')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+      </div>
+    </section>
+
+    <!-- New Empty Code 11 -->
+    <section class="snippet">
+      <h2>Code 11</h2>
+      <div class="subtitle">নতুন কোড সেকশন</div>
+      <textarea id="code11" spellcheck="false" wrap="off"><!-- এখানে Code 11 লিখুন --></textarea>
+      <div class="controls">
+        <button onclick="selectCode('code11')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code11')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code11')">Download</button>
+      </div>
+    </section>
+
+    <!-- New Empty Code 12 -->
+    <section class="snippet">
+      <h2>Code 12</h2>
+      <div class="subtitle">নতুন কোড সেকশন</div>
+      <textarea id="code12" spellcheck="false" wrap="off"><!-- এখানে Code 12 লিখুন --></textarea>
+      <div class="controls">
+        <button onclick="selectCode('code12')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code12')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code12')">Download</button>
+      </div>
+    </section>
+
+    <!-- New Empty Code 13 -->
+    <section class="snippet">
+      <h2>Code 13</h2>
+      <div class="subtitle">নতুন কোড সেকশন</div>
+      <textarea id="code13" spellcheck="false" wrap="off"><!-- এখানে Code 13 লিখুন --></textarea>
+      <div class="controls">
+        <button onclick="selectCode('code13')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code13')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code13')">Download</button>
+      </div>
+    </section>
+
+    <!-- New Empty Code 14 -->
+    <section class="snippet">
+      <h2>Code 14</h2>
+      <div class="subtitle">নতুন কোড সেকশন</div>
+      <textarea id="code14" spellcheck="false" wrap="off"><!-- এখানে Code 14 লিখুন --></textarea>
+      <div class="controls">
+        <button onclick="selectCode('code14')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code14')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code14')">Download</button>
+      </div>
+    </section>
+
+    <!-- New Empty Code 15 -->
+    <section class="snippet">
+      <h2>Code 15</h2>
+      <div class="subtitle">নতুন কোড সেকশন</div>
+      <textarea id="code15" spellcheck="false" wrap="off"><!-- এখানে Code 15 লিখুন --></textarea>
+      <div class="controls">
+        <button onclick="selectCode('code15')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code15')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code15')">Download</button>
+      </div>
+    </section>
+
+    <!-- New Empty Code 16 -->
+    <section class="snippet">
+      <h2>Code 16</h2>
+      <div class="subtitle">নতুন কোড সেকশন</div>
+      <textarea id="code16" spellcheck="false" wrap="off"><!-- এখানে Code 16 লিখুন --></textarea>
+      <div class="controls">
+        <button onclick="selectCode('code16')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code16')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code16')">Download</button>
+      </div>
+    </section>
+
+    <!-- New Empty Code 17 -->
+    <section class="snippet">
+      <h2>Code 17</h2>
+      <div class="subtitle">নতুন কোড সেকশন</div>
+      <textarea id="code17" spellcheck="false" wrap="off"><!-- এখানে Code 17 লিখুন --></textarea>
+      <div class="controls">
+        <button onclick="selectCode('code17')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code17')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code17')">Download</button>
+      </div>
+    </section>
+
+    <!-- New Empty Code 18 -->
+    <section class="snippet">
+      <h2>Code 18</h2>
+      <div class="subtitle">নতুন কোড সেকশন</div>
+      <textarea id="code18" spellcheck="false" wrap="off"><!-- এখানে Code 18 লিখুন --></textarea>
+      <div class="controls">
+        <button onclick="selectCode('code18')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code18')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code18')">Download</button>
+      </div>
+    </section>
+
+    <!-- New Empty Code 19 -->
+    <section class="snippet">
+      <h2>Code 19</h2>
+      <div class="subtitle">নতুন কোড সেকশন</div>
+      <textarea id="code19" spellcheck="false" wrap="off"><!-- এখানে Code 19 লিখুন --></textarea>
+      <div class="controls">
+        <button onclick="selectCode('code19')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code19')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code19')">Download</button>
+      </div>
+    </section>
+
+    <!-- New Empty Code 20 -->
+    <section class="snippet">
+      <h2>Code 20</h2>
+      <div class="subtitle">নতুন কোড সেকশন</div>
+      <textarea id="code20" spellcheck="false" wrap="off"><!-- এখানে Code 20 লিখুন --></textarea>
+      <div class="controls">
+        <button onclick="selectCode('code20')">Select All</button>
+        <button class="btn-blue" onclick="copyCode('code20')">Copy</button>
+        <button class="btn-green" onclick="downloadCode('code20')">Download</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="particles" id="particles"></div>
 
   <script>
-    function selectCode(id){
+    // Password configuration
+    const PASSWORD = "Sahibul@2008";
+    
+    // DOM elements
+    const passwordPage = document.getElementById('passwordPage');
+    const mainPage = document.getElementById('mainPage');
+    const passwordInput = document.getElementById('passwordInput');
+    const submitPassword = document.getElementById('submitPassword');
+    const togglePassword = document.getElementById('togglePassword');
+    const message = document.getElementById('message');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const particlesContainer = document.getElementById('particles');
+    
+    // Create floating particles
+    function createParticles() {
+      for (let i = 0; i < 50; i++) {
+        const particle = document.createElement('div');
+        particle.classList.add('particle');
+        
+        // Random size
+        const size = Math.random() * 10 + 5;
+        particle.style.width = `${size}px`;
+        particle.style.height = `${size}px`;
+        
+        // Random position
+        particle.style.left = `${Math.random() * 100}%`;
+        particle.style.top = `${Math.random() * 100}%`;
+        
+        // Random animation duration
+        particle.style.animationDuration = `${Math.random() * 20 + 10}s`;
+        particle.style.animationDelay = `${Math.random() * 5}s`;
+        
+        particlesContainer.appendChild(particle);
+      }
+    }
+    
+    // Toggle password visibility
+    togglePassword.addEventListener('click', function() {
+      if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        togglePassword.textContent = '🙈';
+      } else {
+        passwordInput.type = 'password';
+        togglePassword.textContent = '👁️';
+      }
+    });
+    
+    // Submit password
+    submitPassword.addEventListener('click', function() {
+      const enteredPassword = passwordInput.value.trim();
+      
+      if (enteredPassword === PASSWORD) {
+        // Correct password
+        passwordPage.style.display = 'none';
+        mainPage.style.display = 'block';
+        document.title = "10 Code Store — Sahibul Musa Sium";
+      } else {
+        // Incorrect password
+        message.textContent = "পাসওয়ার্ড ভুল! আবার চেষ্টা করুন।";
+        message.style.display = 'block';
+        message.style.background = 'rgba(239, 68, 68, 0.3)';
+        passwordInput.value = '';
+        passwordInput.focus();
+        
+        // Hide message after 3 seconds
+        setTimeout(() => {
+          message.style.display = 'none';
+        }, 3000);
+      }
+    });
+    
+    // Allow submitting with Enter key
+    passwordInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        submitPassword.click();
+      }
+    });
+    
+    // Logout functionality
+    logoutBtn.addEventListener('click', function() {
+      mainPage.style.display = 'none';
+      passwordPage.style.display = 'block';
+      document.title = "Password Protected - Sahibul Musa Sium";
+      passwordInput.value = '';
+      passwordInput.focus();
+    });
+    
+    // Code management functions
+    function selectCode(id) {
       const ta = document.getElementById(id);
       ta.focus();
       ta.select();
     }
 
-    async function copyCode(id){
+    async function copyCode(id) {
       const ta = document.getElementById(id);
       try {
         ta.select();
@@ -1747,12 +2198,12 @@ if (window.location.href.indexOf("fullcpgrid") > -1) {
           document.execCommand('copy');
         }
         alert(id + ' এর কোড কপি হয়ে গেছে!');
-      } catch(e){
+      } catch(e) {
         alert('কপি হয়নি, ম্যানুয়ালি চেষ্টা করুন।');
       }
     }
 
-    function downloadCode(id){
+    function downloadCode(id) {
       const ta = document.getElementById(id);
       const blob = new Blob([ta.value], {type: 'text/html;charset=utf-8'});
       const url = URL.createObjectURL(blob);
@@ -1764,50 +2215,12 @@ if (window.location.href.indexOf("fullcpgrid") > -1) {
       a.remove();
       URL.revokeObjectURL(url);
     }
-    <!-- Password logic (paste before </body>) -->
-(function(){
-  // ===== CONFIGURE PASSWORD HERE =====
-  const PASSWORD = 'Sahibul@2008';
-  // ===== /CONFIG =====
-
-  const overlay = document.getElementById('pw-overlay');
-  const input = document.getElementById('pwInput');
-  const btn = document.getElementById('pwBtn');
-
-  // যদি আগে session এ আনলক করা থাকে তাহলে সরাসরি দেখাবে
-  if (sessionStorage.getItem('site_unlocked') === '1') {
-    overlay.setAttribute('aria-hidden','true');
-  } else {
-    overlay.setAttribute('aria-hidden','false');
-    input.focus();
-  }
-
-  function unlock() {
-    const v = (input.value || '').trim();
-    if (!v) { alert('পাসওয়ার্ড দিন।'); input.focus(); return; }
-    if (v === PASSWORD) {
-      sessionStorage.setItem('site_unlocked','1'); // সেশন পর্যন্ত
-      overlay.setAttribute('aria-hidden','true');
-      input.value = '';
-    } else {
-      alert('পাসওয়ার্ড ভুল। আবার চেষ্টা করুন।');
-      input.value = '';
-      input.focus();
-    }
-  }
-
-  btn.addEventListener('click', unlock);
-  input.addEventListener('keydown', function(e){ if (e.key === 'Enter') unlock(); });
-
-  // (অপশনাল) Ctrl+Shift+U দিয়ে দ্রুত আনলক — ডেভ টুলস থেকে কপি/চেঞ্জ করলেও কাজে আসবে না;
-  // নিরাপত্তা বাড়াতে এই লাইনটি মুছে ফেলতে পারেন
-  document.addEventListener('keydown', function(e){
-    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'u') {
-      // quick hint (optional) — comment বা remove for more secrecy
-      alert('পাসওয়ার্ড টিপুন।');
-    }
-  });
-})();
+    
+    // Initialize the page
+    window.addEventListener('DOMContentLoaded', function() {
+      createParticles();
+      passwordInput.focus();
+    });
   </script>
 </body>
 </html>
