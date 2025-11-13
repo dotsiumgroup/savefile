@@ -1925,8 +1925,34 @@ if (window.location.href.indexOf("fullcpgrid") > -1) {
     <!-- Existing Code 7 -->
     <section class="snippet">
       <h2>Code 7</h2>
-      <div class="subtitle">👉 Image Gallery</div>
-      <textarea id="code7" spellcheck="false" wrap="off"><!-- এখানে Code 7 লিখুন --></textarea>
+      <div class="subtitle">🔥 Web to Sheet সফল appscript code ইস্টকচার</div>
+      <textarea id="code7" spellcheck="false" wrap="off">
+		  function doPost(e) {
+try {
+// প্রথমে raw data দেখাই
+Logger.log("Raw Data: " + e.postData.contents);
+
+// JSON parse করার চেষ্টা  
+var data = JSON.parse(e.postData.contents || "{}");  
+Logger.log("Parsed Data: " + JSON.stringify(data));  
+
+// শীট খোলার চেষ্টা  
+var sheet = SpreadsheetApp.openById("1QV0CHpQmvC2FqJo3_aeSqtu3o-QAXWhhOV_PsAmK1es")  
+                           .getSheetByName("Sheet1");  
+
+// শীটে row add করার চেষ্টা  
+sheet.appendRow([new Date(), data.name, data.message]);  
+
+return ContentService.createTextOutput("Success: " + data.name)  
+                     .setMimeType(ContentService.MimeType.TEXT);
+
+} catch (err) {
+Logger.log("ERROR: " + err);
+return ContentService.createTextOutput("ERROR: " + err)
+.setMimeType(ContentService.MimeType.TEXT);
+}
+}
+	  </textarea>
       <div class="controls">
         <button onclick="selectCode('code7')">Select All</button>
         <button class="btn-blue" onclick="copyCode('code7')">Copy</button>
@@ -2095,7 +2121,7 @@ if (window.location.href.indexOf("fullcpgrid") > -1) {
 
   <script>
     // Password configuration
-    const PASSWORD = "Sahibul@2008";
+    const PASSWORD = "EDITOR@PAGE-435";
     
     // DOM elements
     const passwordPage = document.getElementById('passwordPage');
