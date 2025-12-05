@@ -1709,8 +1709,399 @@ return ContentService.createTextOutput("ERROR: " + err)
   <!-- Code 8 -->
   <section class="snippet">
     <h2>Code 8</h2>
-    <div class="subtitle">👉 Profile Card</div>
-    <textarea id="code8" spellcheck="false" wrap="off"><!-- এখানে Code 8 লিখুন --></textarea>
+    <div class="subtitle">👉 Comment & Reply appscript code</div>
+    <textarea id="code8" spellcheck="false" wrap="off">
+		// ====== CONFIG ======
+const SPREADSHEET_ID = '1CRMYdLBG4SENhLdWVKqofmVH9ChUK8A48oxPIg_-M3s';
+const SHEET_NAME = 'Sheet1';
+
+// ====== UTIL ======
+function respondJson(obj, statusCode) {
+  const response = ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+  if (statusCode) {
+    response.setStatusCode(statusCode);
+  }
+  return response;
+}
+
+function getSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    throw new Error(`Sheet "${SHEET_NAME}" not found`);
+  }
+  return sheet;
+}
+
+// ====== DOGET FOR FETCHING SUBMISSIONS ======
+function doGet(e) {
+  try {
+    const params = e.parameter || {};
+    console.log('GET request received with params:', params);
+    
+    const action = params.action;
+    let result;
+    
+    if (action === 'getSubmissions') {
+      result = getAllSubmissions();
+    } else if (action === 'getReplies') {
+      result = getReplies();
+    } else {
+      result = getAllSubmissions();
+    }
+    
+    return respondJson(result);
+  } catch (error) {
+    console.error('Error in doGet:', error);
+    return respondJson({ 
+      ok: false, 
+      error: error.message,
+      stack: error.stack 
+    }, 500);
+  }
+}
+
+// ====== DOPOST FOR SUBMITTING COMMENTS & REPLIES ======
+function doPost(e) {
+  try {
+    console.log('POST request received');
+    
+    const rawData = e.postData.contents;
+    console.log('Raw POST Data:', rawData);
+    
+    const data = JSON.parse(rawData || "{}");
+    console.log('Parsed POST Data:', JSON.stringify(data));
+    
+    if (data.action === 'submitReply') {
+      console.log('Processing reply submission...');
+      return handleReplySubmission(data);
+    } else {
+      console.log('Processing comment submission...');
+      return handleCommentSubmission(data);
+    }
+      
+  } catch (error) {
+    console.error('ERROR in doPost:', error);
+    return ContentService.createTextOutput(JSON.stringify({
+      ok: false,
+      error: error.message,
+      stack: error.stack
+    }))
+    .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ====== COMMENT SUBMISSION (শিক্ষার্থীর কমেন্ট) ======
+function handleCommentSubmission(data) {
+  try {
+    const sheet = getSheet();
+    
+    if (sheet.getLastRow() === 0) {
+      const headers = [
+        'Date', 
+        'Name', 
+        'Batch', 
+        'Message',
+        'Token No',
+        'ফাকা',
+        'Student\'s Name',
+        'Student\'s Batch',
+        'Student\'s Comment',
+        'Reply Message',
+        'Token No'
+      ];
+      sheet.appendRow(headers);
+      console.log('Headers created successfully');
+    }
+    
+    const timestamp = new Date();
+    const token = data.token || '';
+    
+    console.log('Submitting comment with token:', token);
+    console.log('Student data:', {
+      name: data.name,
+      batch: data.batch,
+      message: data.message,
+      token: token
+    });
+    
+    const rowData = [
+      timestamp,
+      data.name || '',
+      data.batch || '',
+      data.message || '',
+      token,
+      '',
+      '',
+      '',
+      '',
+      '',
+      ''
+    ];
+    
+    sheet.appendRow(rowData);
+    
+    const lastRow = sheet.getLastRow();
+    console.log('Comment added to row:', lastRow);
+    
+    return ContentService.createTextOutput(JSON.stringify({
+      ok: true,
+      message: 'Success: Comment submitted',
+      token: token,
+      name: data.name,
+      batch: data.batch
+    }))
+    .setMimeType(ContentService.MimeType.JSON);
+    
+  } catch (error) {
+    console.error('Error in handleCommentSubmission:', error);
+    throw new Error('Failed to submit comment: ' + error.message);
+  }
+}
+
+// ====== REPLY SUBMISSION (এডমিন/এডিটরের রিপ্লাই) ======
+function handleReplySubmission(data) {
+  try {
+    const sheet = getSheet();
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+    
+    console.log('Searching for token:', data.token);
+    console.log('Total rows in sheet:', values.length);
+    
+    if (values.length <= 1) {
+      throw new Error('No comments found in sheet');
+    }
+    
+    const TOKEN_COLUMN_INDEX = 4;
+    let foundRow = -1;
+    let rowData = null;
+    
+    for (let i = 1; i < values.length; i++) {
+      const rowToken = values[i][TOKEN_COLUMN_INDEX];
+      if (rowToken && rowToken.toString() === data.token) {
+        foundRow = i;
+        rowData = values[i];
+        console.log('Found matching token at row:', i + 1);
+        console.log('Row data:', rowData);
+        break;
+      }
+    }
+    
+    if (foundRow === -1) {
+      console.log('Token search failed. Available tokens:');
+      for (let i = 1; i < Math.min(values.length, 10); i++) {
+        console.log(`Row ${i + 1}:`, values[i][TOKEN_COLUMN_INDEX]);
+      }
+      throw new Error('Token not found: ' + data.token);
+    }
+    
+    const replyTimestamp = new Date();
+    
+    console.log('Updating row with reply data:', {
+      token: data.token,
+      studentName: data.studentName,
+      studentBatch: data.studentBatch,
+      studentComment: data.studentComment,
+      replyMessage: data.replyMessage,
+      answeredBy: data.answeredBy
+    });
+    
+    sheet.getRange(foundRow + 1, 6).setValue(data.answeredBy || 'Admin');
+    sheet.getRange(foundRow + 1, 7).setValue(data.studentName || rowData[1]);
+    sheet.getRange(foundRow + 1, 8).setValue(data.studentBatch || rowData[2]);
+    sheet.getRange(foundRow + 1, 9).setValue(data.studentComment || rowData[3]);
+    sheet.getRange(foundRow + 1, 10).setValue(data.replyMessage || '');
+    sheet.getRange(foundRow + 1, 11).setValue(data.token || '');
+    
+    console.log('Reply submitted successfully for token:', data.token);
+    
+    return ContentService.createTextOutput(JSON.stringify({
+      ok: true,
+      message: 'Success: Reply submitted',
+      token: data.token
+    }))
+    .setMimeType(ContentService.MimeType.JSON);
+    
+  } catch (error) {
+    console.error('Error in handleReplySubmission:', error);
+    throw new Error('Failed to submit reply: ' + error.message);
+  }
+}
+
+// ====== GET ALL SUBMISSIONS ======
+function getAllSubmissions() {
+  try {
+    const sheet = getSheet();
+    const lastRow = sheet.getLastRow();
+    
+    console.log('Getting submissions, last row:', lastRow);
+    
+    if (lastRow <= 1) {
+      return { 
+        ok: true, 
+        data: [],
+        message: 'No submissions yet'
+      };
+    }
+    
+    const dataRange = sheet.getRange(1, 1, lastRow, 11);
+    const values = dataRange.getValues();
+    
+    const submissions = [];
+    
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      
+      const submission = {
+        timestamp: row[0] ? Utilities.formatDate(row[0], Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss') : '',
+        name: row[1] || '',
+        batch: row[2] || '',
+        message: row[3] || '',
+        token: row[4] || '',
+        answeredBy: row[5] || '',
+        studentName: row[6] || '',
+        studentBatch: row[7] || '',
+        studentComment: row[8] || '',
+        reply: row[9] || '',
+        replyToken: row[10] || '',
+        time: row[0] ? Utilities.formatDate(row[0], Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm') : '',
+        hasReply: !!(row[9] && row[9].toString().trim() !== ''),
+        rowNumber: i + 1
+      };
+      
+      submissions.push(submission);
+    }
+    
+    submissions.sort((a, b) => {
+      try {
+        const dateA = a.timestamp ? new Date(a.timestamp) : new Date(0);
+        const dateB = b.timestamp ? new Date(b.timestamp) : new Date(0);
+        return dateB - dateA;
+      } catch (e) {
+        return 0;
+      }
+    });
+    
+    console.log('Total submissions found:', submissions.length);
+    
+    return {
+      ok: true,
+      data: submissions,
+      count: submissions.length,
+      timezone: Session.getScriptTimeZone()
+    };
+    
+  } catch (error) {
+    console.error('Error in getAllSubmissions:', error);
+    return {
+      ok: false,
+      error: error.message,
+      stack: error.stack
+    };
+  }
+}
+
+// ====== GET REPLIES ONLY ======
+function getReplies() {
+  try {
+    const result = getAllSubmissions();
+    
+    if (!result.ok) {
+      throw new Error('Failed to get submissions');
+    }
+    
+    const replies = result.data.filter(item => 
+      item.reply && item.reply.toString().trim() !== ''
+    );
+    
+    return {
+      ok: true,
+      data: replies,
+      count: replies.length
+    };
+    
+  } catch (error) {
+    console.error('Error in getReplies:', error);
+    return {
+      ok: false,
+      error: error.message
+    };
+  }
+}
+
+// ====== SETUP FUNCTION ======
+function setupSheet() {
+  try {
+    const sheet = getSheet();
+    
+    const headers = [
+      'Date', 
+      'Name', 
+      'Batch', 
+      'Message',
+      'Token No',
+      'ফাকা/Answered By',
+      'Student\'s Name',
+      'Student\'s Batch',
+      'Student\'s Comment',
+      'Reply Message',
+      'Token No (দ্বিতীয় বার)'
+    ];
+    
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(headers);
+      
+      const sampleTimestamp = new Date();
+      
+      const sampleData = [
+        sampleTimestamp,
+        'Sample Student',
+        'ALIM-27',
+        'This is a sample comment for testing',
+        '',
+        '', '', '', '', '', ''
+      ];
+      
+      sheet.appendRow(sampleData);
+    }
+    
+    const headerRange = sheet.getRange(1, 1, 1, 11);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#4a86e8');
+    headerRange.setFontColor('white');
+    
+    sheet.setColumnWidth(1, 150);
+    sheet.setColumnWidth(2, 150);
+    sheet.setColumnWidth(3, 100);
+    sheet.setColumnWidth(4, 300);
+    sheet.setColumnWidth(5, 120);
+    sheet.setColumnWidth(6, 150);
+    sheet.setColumnWidth(7, 150);
+    sheet.setColumnWidth(8, 100);
+    sheet.setColumnWidth(9, 300);
+    sheet.setColumnWidth(10, 300);
+    sheet.setColumnWidth(11, 120);
+    
+    console.log('Sheet setup completed successfully');
+    
+    return {
+      ok: true,
+      message: 'Sheet setup completed',
+      sheetUrl: `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit#gid=${sheet.getSheetId()}`
+    };
+    
+  } catch (error) {
+    console.error('Error in setupSheet:', error);
+    return {
+      ok: false,
+      error: error.message
+    };
+  }
+}
+
+	</textarea>
     <div class="controls">
       <button onclick="selectCode('code8')">Select All</button>
       <button class="btn-blue" onclick="copyCode('code8')">Copy</button>
