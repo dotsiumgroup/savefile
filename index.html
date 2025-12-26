@@ -2112,8 +2112,74 @@ function setupSheet() {
   <!-- Code 9 -->
   <section class="snippet">
     <h2>Code 9</h2>
-    <div class="subtitle">👉 Footer Section</div>
-    <textarea id="code9" spellcheck="false" wrap="off"><!-- এখানে Code 9 লিখুন --></textarea>
+    <div class="subtitle">👉 BOM APP LOG history appscript code</div>
+    <textarea id="code9" spellcheck="false" wrap="off">
+		function doPost(e) {
+  try {
+    // র raw data লগ করি
+    Logger.log("Raw Data: " + e.postData.contents);
+    
+    // JSON parse করার চেষ্টা
+    var data;
+    try {
+      data = JSON.parse(e.postData.contents || "{}");
+    } catch (parseError) {
+      // যদি JSON parse fail হয়, URL-encoded form data হিসেবে চেষ্টা করি
+      data = {};
+      var params = e.postData.contents.split('&');
+      for (var i = 0; i < params.length; i++) {
+        var pair = params[i].split('=');
+        if (pair.length == 2) {
+          data[pair[0]] = decodeURIComponent(pair[1]);
+        }
+      }
+    }
+    
+    Logger.log("Parsed Data: " + JSON.stringify(data));
+    
+    // বাংলাদেশ সময় (UTC+6)
+    var now = new Date();
+    var bangladeshTime = new Date(now.getTime() + (6 * 60 * 60 * 1000));
+    
+    // তারিখ ফরম্যাট: DD-MM-YYYY
+    var day = ("0" + bangladeshTime.getDate()).slice(-2);
+    var month = ("0" + (bangladeshTime.getMonth() + 1)).slice(-2);
+    var year = bangladeshTime.getFullYear();
+    var dateStr = day + "-" + month + "-" + year;
+    
+    // ডেটা প্রস্তুত
+    var type = data.type || "A NEW PERSON";
+    var name = data.name || "A NEW PERSON";
+    var batch = data.batch || "ALIM-27";
+    
+    // আপনার নতুন শীট খোলার চেষ্টা
+    var sheetId = "1id0hNy1lAZZzW4Eyl3h7KoyGhRyHEkWltWz8BrhvrUM";
+    var sheet = SpreadsheetApp.openById(sheetId)
+                               .getSheetByName("Sheet1");
+    
+    Logger.log("Sheet accessed successfully: " + sheet.getName());
+    
+    // শীটে row add করার চেষ্টা
+    sheet.appendRow([new Date(), dateStr, type, name, batch]);
+    
+    Logger.log("Row added successfully: " + dateStr + " | " + type + " | " + name + " | " + batch);
+    
+    return ContentService.createTextOutput("Success: " + name)
+                         .setMimeType(ContentService.MimeType.TEXT);
+    
+  } catch (err) {
+    Logger.log("ERROR: " + err);
+    return ContentService.createTextOutput("ERROR: " + err)
+                         .setMimeType(ContentService.MimeType.TEXT);
+  }
+}
+
+// GET রিকোয়েস্টের জন্য (পরীক্ষার উদ্দেশ্যে)
+function doGet(e) {
+  return ContentService.createTextOutput("Visitor Tracker API is running")
+                       .setMimeType(ContentService.MimeType.TEXT);
+}
+	</textarea>
     <div class="controls">
       <button onclick="selectCode('code9')">Select All</button>
       <button class="btn-blue" onclick="copyCode('code9')">Copy</button>
@@ -2124,7 +2190,127 @@ function setupSheet() {
   <!-- Code 10 -->
   <section class="snippet">
     <h2>Code 10</h2>
-    <div class="subtitle">👉 Full Page Template</div>
+    <div class="subtitle">👉 titel লিখতে হবে</div>
+    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="controls">
+      <button onclick="selectCode('code10')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+    </div>
+  </section>
+
+			<!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 11</h2>
+    <div class="subtitle">👉 titel লিখতে হবে</div>
+    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="controls">
+      <button onclick="selectCode('code10')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+    </div>
+  </section>
+
+  <!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 12</h2>
+    <div class="subtitle">👉 titel লিখতে হবে</div>
+    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="controls">
+      <button onclick="selectCode('code10')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+    </div>
+  </section>
+
+ <!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 13</h2>
+    <div class="subtitle">👉 titel লিখতে হবে</div>
+    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="controls">
+      <button onclick="selectCode('code10')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+    </div>
+  </section>
+
+  <!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 14</h2>
+    <div class="subtitle">👉 titel লিখতে হবে</div>
+    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="controls">
+      <button onclick="selectCode('code10')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+    </div>
+  </section>
+
+	<!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 15</h2>
+    <div class="subtitle">👉 titel লিখতে হবে</div>
+    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="controls">
+      <button onclick="selectCode('code10')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+    </div>
+  </section>
+
+	<!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 16</h2>
+    <div class="subtitle">👉 titel লিখতে হবে</div>
+    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="controls">
+      <button onclick="selectCode('code10')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+    </div>
+  </section>
+
+	<!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 17</h2>
+    <div class="subtitle">👉 titel লিখতে হবে</div>
+    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="controls">
+      <button onclick="selectCode('code10')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+    </div>
+  </section>
+
+	<!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 18</h2>
+    <div class="subtitle">👉 titel লিখতে হবে</div>
+    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="controls">
+      <button onclick="selectCode('code10')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+    </div>
+  </section>
+
+	<!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 19</h2>
+    <div class="subtitle">👉 titel লিখতে হবে</div>
+    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="controls">
+      <button onclick="selectCode('code10')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+    </div>
+  </section>
+
+  <!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 20</h2>
+    <div class="subtitle">👉 titel লিখতে হবে</div>
     <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
     <div class="controls">
       <button onclick="selectCode('code10')">Select All</button>
