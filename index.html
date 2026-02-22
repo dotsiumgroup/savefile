@@ -2190,8 +2190,77 @@ function doGet(e) {
   <!-- Code 10 -->
   <section class="snippet">
     <h2>Code 10</h2>
-    <div class="subtitle">👉 titel লিখতে হবে</div>
-    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="subtitle">Student control 1, student info appscript</div>
+    <textarea id="code10" spellcheck="false" wrap="off">
+		// ====== CONFIG ======
+const SPREADSHEET_ID = '1q2tgi6q86uUH1SbMDwRoUxBA1ni43hSX8s-hMCTdkUw';
+const SHEET_NAME = 'Sheet1';
+
+// ====== UTIL ======
+function respondJson(obj, statusCode) {
+  const response = ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+  if (statusCode) response.setStatusCode(statusCode);
+  return response;
+}
+
+function getSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) throw new Error(`Sheet "${SHEET_NAME}" not found`);
+  return sheet;
+}
+
+// ====== DOGET ======
+function doGet(e) {
+  try {
+    const params = e.parameter || {};
+    const action = params.action;
+    if (action === 'getStudent') {
+      return handleGetStudent(params);
+    } else {
+      return respondJson({ ok: false, error: 'Invalid action' }, 400);
+    }
+  } catch (error) {
+    return respondJson({ ok: false, error: error.message }, 500);
+  }
+}
+
+// ====== GET STUDENT INFO ======
+// কলাম: A = timestamp, B = WhatsApp, C = Password, D = Name
+function handleGetStudent(params) {
+  const sheet = getSheet();
+  const whatsapp = (params.whatsapp || '').trim();
+  const password = (params.password || '').trim();
+
+  if (!whatsapp || !password) {
+    return respondJson({ ok: true, found: false });
+  }
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    return respondJson({ ok: true, found: false });
+  }
+
+  // সারি 1 থেকে শুরু (হেডার বাদ)
+  for (let i = 1; i < data.length; i++) {
+    const rowWhatsapp = data[i][1] ? data[i][1].toString().trim() : ''; // কলাম B
+    const rowPassword = data[i][2] ? data[i][2].toString().trim() : ''; // কলাম C
+    const rowName = data[i][3] ? data[i][3].toString().trim() : '';      // কলাম D
+
+    if (rowWhatsapp === whatsapp && rowPassword === password) {
+      return respondJson({
+        ok: true,
+        found: true,
+        name: rowName,
+        whatsapp: rowWhatsapp
+      });
+    }
+  }
+
+  return respondJson({ ok: true, found: false });
+}
+	</textarea>
     <div class="controls">
       <button onclick="selectCode('code10')">Select All</button>
       <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
@@ -2202,8 +2271,127 @@ function doGet(e) {
 			<!-- Code 10 -->
   <section class="snippet">
     <h2>Code 11</h2>
-    <div class="subtitle">👉 titel লিখতে হবে</div>
-    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="subtitle">Student control 2, student log track appscript</div>
+    <textarea id="code10" spellcheck="false" wrap="off">
+		// ====== CONFIG ======
+const SPREADSHEET_ID = '1Gpp1Or488h-NIIwlwxCouVXz3DZFu9EKcPw-qIKXbNU';
+const SHEET_NAME = 'Sheet1';
+const MAX_LOGIN = 5;
+
+// ====== UTIL ======
+function respondJson(obj, statusCode) {
+  const response = ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+  if (statusCode) response.setStatusCode(statusCode);
+  return response;
+}
+
+function getSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) throw new Error(`Sheet "${SHEET_NAME}" not found`);
+  return sheet;
+}
+
+// ====== DOGET ======
+function doGet(e) {
+  try {
+    const params = e.parameter || {};
+    const action = params.action;
+    if (action === 'getLogs') {
+      return handleGetLogs(params);
+    } else if (action === 'increment') {
+      return handleIncrementLog(params);
+    } else {
+      return respondJson({ ok: false, error: 'Invalid action' }, 400);
+    }
+  } catch (error) {
+    return respondJson({ ok: false, error: error.message }, 500);
+  }
+}
+
+// ====== GET LOGS ======
+function handleGetLogs(params) {
+  const sheet = getSheet();
+  const whatsapp = (params.whatsapp || '').trim();
+
+  if (!whatsapp) {
+    return respondJson({ ok: true, exists: false });
+  }
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    return respondJson({ ok: true, exists: false });
+  }
+
+  // কলাম A = WhatsApp, B-F = log1..log5
+  for (let i = 1; i < data.length; i++) {
+    const rowWhatsapp = data[i][0] ? data[i][0].toString().trim() : '';
+    if (rowWhatsapp === whatsapp) {
+      const logs = data[i].slice(1, 6);
+      let count = 0;
+      const logArray = [];
+      for (let j = 0; j < logs.length; j++) {
+        const val = logs[j] ? logs[j].toString().trim() : '';
+        if (val.toUpperCase() === 'DONE') {
+          count++;
+          logArray.push('DONE');
+        } else {
+          logArray.push('');
+        }
+      }
+      return respondJson({
+        ok: true,
+        exists: true,
+        count: count,
+        logs: logArray,
+        total: MAX_LOGIN
+      });
+    }
+  }
+
+  return respondJson({ ok: true, exists: false });
+}
+
+// ====== INCREMENT LOG ======
+function handleIncrementLog(params) {
+  const sheet = getSheet();
+  const whatsapp = (params.whatsapp || '').trim();
+
+  if (!whatsapp) {
+    return respondJson({ ok: false, error: 'Missing whatsapp' });
+  }
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    return respondJson({ ok: false, error: 'No data' });
+  }
+
+  let targetRow = -1;
+  for (let i = 1; i < data.length; i++) {
+    const rowWhatsapp = data[i][0] ? data[i][0].toString().trim() : '';
+    if (rowWhatsapp === whatsapp) {
+      targetRow = i + 1; // 1-indexed row number
+      break;
+    }
+  }
+
+  if (targetRow === -1) {
+    return respondJson({ ok: false, error: 'WhatsApp not found in tracker' });
+  }
+
+  // খালি কলাম খুঁজে DONE বসান (কলাম B = 2, F = 6)
+  for (let col = 2; col <= 6; col++) {
+    const cellValue = sheet.getRange(targetRow, col).getValue();
+    if (!cellValue || cellValue.toString().trim() === '') {
+      sheet.getRange(targetRow, col).setValue('DONE');
+      return respondJson({ ok: true, message: 'Login count incremented' });
+    }
+  }
+
+  return respondJson({ ok: false, error: 'Maximum login limit reached (5/5)' });
+}
+	</textarea>
     <div class="controls">
       <button onclick="selectCode('code10')">Select All</button>
       <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
