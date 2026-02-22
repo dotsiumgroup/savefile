@@ -2402,8 +2402,425 @@ function handleIncrementLog(params) {
   <!-- Code 10 -->
   <section class="snippet">
     <h2>Code 12</h2>
-    <div class="subtitle">👉 titel লিখতে হবে</div>
-    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="subtitle">student log control project JavaScript code</div>
+    <textarea id="code10" spellcheck="false" wrap="off">
+		<!-- ========== ইউজার ভেরিফিকেশন সিস্টেম (আপডেটেড) ========== -->
+<script>
+(function() {
+  // ========== কনফিগারেশন ==========
+  const WHATSAPP_CONTACT = '01921996424'; // প্রদর্শনের জন্য
+  const WHATSAPP_LINK = 'https://wa.me/8801921996424'; // লিংক
+  const STUDENT_API_URL = 'https://script.google.com/macros/s/AKfycbwNvYEbr371zzxYCzRRHL9pxYBjAWHVgDBtfpeAYyZAw8CNdHbLCf5NrHonsCRfQRVxkg/exec'; // পরিবর্তন করুন
+  const LOGIN_TRACKER_API_URL = 'https://script.google.com/macros/s/AKfycbzBaQems0XoWOan98pyne3i3698sXa-K3eXfInrD6EsviwjtC7nse7mlj5W2_PMDAmE/exec'; // পরিবর্তন করুন
+  const GOOGLE_FORM_URL = 'https://forms.gle/qjZDYqiQ1GMg9KGo9';
+
+  // ========== স্টেট ==========
+  let currentUserData = null;
+  let pendingLoginData = null;
+  let pendingLinkCallback = null;
+
+  // ========== ইউজার রোল চেক (alim26 prefix) ==========
+  function isUser() {
+    return localStorage.getItem('alim26_user_role') === 'user';
+  }
+
+  function isVerified() {
+    return localStorage.getItem('alim26_user_verified') === 'true';
+  }
+
+  function setVerified() {
+    localStorage.setItem('alim26_user_verified', 'true');
+    updateLockIcons(); // লক আইকন আপডেট
+  }
+
+  // ========== লক আইকন আপডেট ==========
+  function updateLockIcons() {
+    const verified = isVerified();
+    document.querySelectorAll('.card .btn').forEach(btn => {
+      let lockIcon = btn.querySelector('.lock-icon');
+      if (!verified && isUser()) {
+        if (!lockIcon) {
+          lockIcon = document.createElement('i');
+          lockIcon.className = 'fas fa-lock lock-icon';
+          lockIcon.style.marginRight = '5px';
+          btn.prepend(lockIcon);
+        }
+      } else {
+        if (lockIcon) lockIcon.remove();
+      }
+    });
+  }
+
+  // ========== মডেল তৈরি ==========
+  function createModals() {
+    if (document.getElementById('whatsappAuthModal')) return;
+
+    // মডেল ০: আগে জিজ্ঞাসা
+    const modal0 = document.createElement('div');
+    modal0.id = 'preAuthModal';
+    modal0.className = 'warning-modal';
+    modal0.style.zIndex = '100000';
+    modal0.style.display = 'none';
+    modal0.innerHTML = `
+      <div class="modal-content" style="max-width: 450px;">
+        <div class="modal-header">
+          <h2 class="bangla-font">তথ্য যাচাই</h2>
+        </div>
+        <div class="modal-body">
+          <p class="bangla-font">আপনি কি পূর্বে গুগল ফর্মের মাধ্যমে আপনার নাম, হোয়াটসঅ্যাপ নাম্বার এবং পাসওয়ার্ড আমাদেরকে জানিয়েছিলেন?</p>
+        </div>
+        <div class="modal-footer" style="display:flex; justify-content:center; gap:15px;">
+          <button class="modal-ok-btn bangla-font" id="preYesBtn" style="background:#4CAF50;">হ্যাঁ</button>
+          <button class="modal-ok-btn bangla-font" id="preNoBtn" style="background:#f44336;">না</button>
+        </div>
+      </div>
+    `;
+
+    // মডেল ১: হোয়াটসঅ্যাপ ও পাসওয়ার্ড
+    const modal1 = document.createElement('div');
+    modal1.id = 'whatsappAuthModal';
+    modal1.className = 'warning-modal';
+    modal1.style.zIndex = '100000';
+    modal1.style.display = 'none';
+    modal1.innerHTML = `
+      <div class="modal-content" style="max-width: 450px;">
+        <div class="modal-header">
+          <h2 class="bangla-font">অতিরিক্ত যাচাইকরণ প্রয়োজন</h2>
+        </div>
+        <div class="modal-body">
+          <p class="bangla-font">আপনার হোয়াটসঅ্যাপ নম্বর এবং ব্যক্তিগত পাসওয়ার্ড দিন।</p>
+          <div class="form-section" style="gap: 15px;">
+            <input type="text" id="whatsappInput" class="bangla-font" placeholder="হোয়াটসঅ্যাপ নম্বর (যেমন: 017xxxxxxxx)" style="width:100%; padding:12px; border-radius:8px; border:1px solid #ccc;">
+            <input type="password" id="whatsappPassword" class="bangla-font" placeholder="পাসওয়ার্ড" style="width:100%; padding:12px; border-radius:8px; border:1px solid #ccc;">
+            <div id="authError" class="error-message bangla-font" style="display:none; color:#EF7674; text-align:center;">ভুল তথ্য। আবার চেষ্টা করুন।</div>
+          </div>
+        </div>
+        <div class="modal-footer" style="display:flex; justify-content:center; gap:15px;">
+          <button class="modal-ok-btn bangla-font" id="submitWhatsappBtn"><span id="submitBtnText">যাচাই করুন</span> <span id="submitSpinner" style="display:none;" class="spinner"></span></button>
+          <button class="modal-ok-btn bangla-font" id="cancelWhatsappBtn" style="background:#666;">বাতিল</button>
+        </div>
+      </div>
+    `;
+
+    // মডেল ২: নিশ্চিতকরণ
+    const modal2 = document.createElement('div');
+    modal2.id = 'loginConfirmModal';
+    modal2.className = 'warning-modal';
+    modal2.style.zIndex = '100000';
+    modal2.style.display = 'none';
+    modal2.innerHTML = `
+      <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+          <h2 class="bangla-font">শুভেচ্ছা!</h2>
+        </div>
+        <div class="modal-body">
+          <p class="bangla-font" id="confirmMessage"></p>
+          <p class="bangla-font" id="loginCountMessage" style="margin-top:10px; font-weight:600;"></p>
+        </div>
+        <div class="modal-footer" style="display:flex; justify-content:center; gap:20px;">
+          <button class="modal-ok-btn bangla-font" id="confirmYesBtn" style="background: #4CAF50; padding:12px 40px;" disabled>হ্যাঁ, লগইন করুন</button>
+          <button class="modal-ok-btn bangla-font" id="confirmNoBtn" style="background: #666; padding:8px 20px;">না</button>
+        </div>
+      </div>
+    `;
+
+    // মডেল ৩: অননুমোদিত
+    const modal3 = document.createElement('div');
+    modal3.id = 'unauthorizedModal';
+    modal3.className = 'warning-modal';
+    modal3.style.zIndex = '100000';
+    modal3.style.display = 'none';
+    modal3.innerHTML = `
+      <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+          <h2 class="bangla-font">অনুমোদন প্রয়োজন</h2>
+        </div>
+        <div class="modal-body">
+          <p class="bangla-font" id="unauthMessage"></p>
+          <p class="bangla-font">নিচের নম্বরে যোগাযোগ করুন:</p>
+          <p style="font-size:1.5rem; font-weight:700; color:#00eaff;">${WHATSAPP_CONTACT}</p>
+          <p class="bangla-font" style="font-size:0.85rem; color:#ffaa00;">⚠️ সরাসরি ফোন দেওয়া নিষেধ। WhatsApp গ্রুপে এড থাকা আপনার WhatsApp মোবাইল নাম্বার সহ প্রয়োজনীয় প্রমাণসহ WhatsApp এ দিন। ৭২ ঘণ্টার মধ্যে অনুমতি দেওয়া হবে।</p>
+          <a href="${WHATSAPP_LINK}" target="_blank" class="whatsapp-link" style="display:inline-flex; margin-top:15px;">
+            <i class="fab fa-whatsapp"></i> WhatsApp
+          </a>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-ok-btn bangla-font" id="unauthCloseBtn">ঠিক আছে</button>
+        </div>
+      </div>
+    `;
+
+    // মডেল ৪: সীমা অতিক্রম
+    const modal4 = document.createElement('div');
+    modal4.id = 'limitExceedModal';
+    modal4.className = 'warning-modal';
+    modal4.style.zIndex = '100000';
+    modal4.style.display = 'none';
+    modal4.innerHTML = `
+      <div class="modal-content" style="max-width: 450px;">
+        <div class="modal-header">
+          <h2 class="bangla-font">লগইন সীমা অতিক্রম</h2>
+        </div>
+        <div class="modal-body">
+          <p class="bangla-font">আপনি ইতিমধ্যে সর্বোচ্চ ৫ বার লগইন করেছেন। আর লগইন করা সম্ভব নয়।</p>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-ok-btn bangla-font" id="limitCloseBtn">ঠিক আছে</button>
+        </div>
+      </div>
+    `;
+
+    // মডেল ৫: নিবন্ধন করেননি
+    const modal5 = document.createElement('div');
+    modal5.id = 'notRegisteredModal';
+    modal5.className = 'warning-modal';
+    modal5.style.zIndex = '100000';
+    modal5.style.display = 'none';
+    modal5.innerHTML = `
+      <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+          <h2 class="bangla-font">প্রথমে নিবন্ধন করুন</h2>
+        </div>
+        <div class="modal-body">
+          <p class="bangla-font">তথ্য যাচাই শুরু করার পূর্বে আপনি গুগল ফর্মের মাধ্যমে আপনার নাম, গ্রুপে এড থাকা WhatsApp নাম্বার এবং পাসওয়ার্ড আমাদের জানান।</p>
+          <a href="${GOOGLE_FORM_URL}" target="_blank" class="btn" style="display:block; text-align:center; margin-top:20px;">ফর্ম খুলুন</a>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-ok-btn bangla-font" id="notRegisteredCloseBtn">ঠিক আছে</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal0);
+    document.body.appendChild(modal1);
+    document.body.appendChild(modal2);
+    document.body.appendChild(modal3);
+    document.body.appendChild(modal4);
+    document.body.appendChild(modal5);
+
+    // ইভেন্ট লিসেনার
+    document.getElementById('preYesBtn').addEventListener('click', () => {
+      hideModal('preAuthModal');
+      showWhatsappModal();
+    });
+    document.getElementById('preNoBtn').addEventListener('click', () => {
+      hideModal('preAuthModal');
+      showModal('notRegisteredModal');
+    });
+    document.getElementById('notRegisteredCloseBtn').addEventListener('click', () => hideModal('notRegisteredModal'));
+
+    document.getElementById('submitWhatsappBtn').addEventListener('click', validateWhatsappAndPassword);
+    document.getElementById('cancelWhatsappBtn').addEventListener('click', hideWhatsappModal);
+    document.getElementById('confirmYesBtn').addEventListener('click', proceedLogin);
+    document.getElementById('confirmNoBtn').addEventListener('click', cancelLogin);
+    document.getElementById('unauthCloseBtn').addEventListener('click', () => hideModal('unauthorizedModal'));
+    document.getElementById('limitCloseBtn').addEventListener('click', () => hideModal('limitExceedModal'));
+  }
+
+  // ========== মডেল দেখানো/লুকানো ==========
+  function showModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.add('show');
+    }
+  }
+  function hideModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.classList.remove('show');
+      modal.styl.display = 'none';
+    }
+  }
+
+  function showWhatsappModal() {
+    showModal('whatsappAuthModal');
+    document.getElementById('authError').style.display = 'none';
+    document.getElementById('whatsappInput').value = '';
+    document.getElementById('whatsappPassword').value = '';
+    // স্পিনার রিসেট
+    document.getElementById('submitBtnText').style.display = 'inline';
+    document.getElementById('submitSpinner').style.display = 'none';
+    document.getElementById('submitWhatsappBtn').disabled = false;
+  }
+  function hideWhatsappModal() {
+    hideModal('whatsappAuthModal');
+  }
+
+  function showConfirmModal(name, countLeft) {
+    document.getElementById('confirmMessage').innerHTML = `প্রিয় শিক্ষার্থী, আমি আপনাকে চিনতে পেরেছি। আপনার নাম <strong>${name}</strong>।`;
+    document.getElementById('loginCountMessage').innerText = `আপনি পূর্বে ${5 - countLeft} বার লগইন করেছেন। এখন লগইন করলে আপনি আর ${countLeft-1} বার লগইন করতে পারবেন।`;
+    // হ্যাঁ বাটন সক্রিয় করুন
+    const yesBtn = document.getElementById('confirmYesBtn');
+    yesBtn.disabled = false;
+    yesBtn.style.opacity = '1';
+    showModal('loginConfirmModal');
+  }
+  function hideConfirmModal() {
+    hideModal('loginConfirmModal');
+  }
+
+  // ========== API কল ==========
+  async function fetchStudentInfo(whatsapp, password) {
+    const url = `${STUDENT_API_URL}?action=getStudent&whatsapp=${encodeURIComponent(whatsapp)}&password=${encodeURIComponent(password)}`;
+    try {
+      const res = await fetch(url, { method: 'GET', mode: 'cors' });
+      if (!res.ok) throw new Error('Network error');
+      const data = await res.json();
+      if (data.ok && data.found) return { name: data.name, whatsapp: data.whatsapp };
+      return null;
+    } catch (e) {
+      console.error('Student info fetch error:', e);
+      return null;
+    }
+  }
+
+  async function checkLoginLimit(whatsapp) {
+    const url = `${LOGIN_TRACKER_API_URL}?action=getLogs&whatsapp=${encodeURIComponent(whatsapp)}`;
+    try {
+      const res = await fetch(url, { method: 'GET', mode: 'cors' });
+      if (!res.ok) throw new Error('Network error');
+      const data = await res.json();
+      if (data.ok) return { exists: data.exists, count: data.count };
+      return { exists: false, count: 0 };
+    } catch (e) {
+      console.error('Login limit fetch error:', e);
+      return { exists: false, count: 0 };
+    }
+  }
+
+  async function incrementLoginCount(whatsapp) {
+    const url = `${LOGIN_TRACKER_API_URL}?action=increment&whatsapp=${encodeURIComponent(whatsapp)}`;
+    try {
+      await fetch(url, { method: 'GET', mode: 'no-cors' });
+    } catch (e) {
+      console.error('Increment error:', e);
+    }
+  }
+
+  // ========== যাচাইকরণ ==========
+  async function validateWhatsappAndPassword() {
+    const whatsapp = document.getElementById('whatsappInput').value.trim();
+    const password = document.getElementById('whatsappPassword').value.trim();
+    if (!whatsapp || !password) {
+      document.getElementById('authError').style.display = 'block';
+      return;
+    }
+
+    // স্পিনার চালু
+    document.getElementById('submitBtnText').style.display = 'none';
+    document.getElementById('submitSpinner').style.display = 'inline-block';
+    document.getElementById('submitWhatsappBtn').disabled = true;
+
+    const student = await fetchStudentInfo(whatsapp, password);
+    if (!student) {
+      document.getElementById('authError').style.display = 'block';
+      document.getElementById('submitBtnText').style.display = 'inline';
+      document.getElementById('submitSpinner').style.display = 'none';
+      document.getElementById('submitWhatsappBtn').disabled = false;
+      return;
+    }
+
+    currentUserData = student;
+    const limitData = await checkLoginLimit(whatsapp);
+
+    if (!limitData.exists) {
+      hideWhatsappModal();
+      showUnauthorizedModal(student.name);
+      document.getElementById('submitBtnText').style.display = 'inline';
+      document.getElementById('submitSpinner').style.display = 'none';
+      return;
+    }
+
+    const loginCount = limitData.count;
+    if (loginCount >= 5) {
+      hideWhatsappModal();
+      showLimitModal();
+      document.getElementById('submitBtnText').style.display = 'inline';
+      document.getElementById('submitSpinner').style.display = 'none';
+      return;
+    }
+
+    hideWhatsappModal();
+    pendingLoginData = { whatsapp, loginCount: loginCount + 1 };
+    showConfirmModal(student.name, 5 - loginCount);
+    document.getElementById('submitBtnText').style.display = 'inline';
+    document.getElementById('submitSpinner').style.display = 'none';
+  }
+
+  function showUnauthorizedModal(name) {
+    document.getElementById('unauthMessage').innerHTML = `প্রিয় শিক্ষার্থী, আমি আপনাকে চিনতে পেরেছি। আপনার নাম <strong>${name}</strong>।<br> তবে আপনার হোয়াটসঅ্যাপ নম্বরটি আমাদের অনুমোদিত তালিকায় পাওয়া যায়নি।`;
+    showModal('unauthorizedModal');
+  }
+  function showLimitModal() {
+    showModal('limitExceedModal');
+  }
+
+  function proceedLogin() {
+    // হ্যাঁ বাটন নিষ্ক্রিয় ও ১০ সেকেন্ড কাউন্ট
+    const yesBtn = document.getElementById('confirmYesBtn');
+    yesBtn.disabled = true;
+    yesBtn.style.opacity = '0.5';
+    setTimeout(() => {
+      yesBtn.disabled = false;
+      yesBtn.style.opacity = '1';
+    }, 10000);
+
+    if (pendingLoginData) {
+      incrementLoginCount(pendingLoginData.whatsapp);
+    }
+    hideConfirmModal();
+
+    setVerified();
+    if (pendingLinkCallback) {
+      pendingLinkCallback();
+      pendingLinkCallback = null;
+    }
+    updateLockIcons(); // লক সরিয়ে ফেলুন
+  }
+
+  function cancelLogin() {
+    hideConfirmModal();
+    pendingLinkCallback = null;
+  }
+
+  // ========== লিংক প্রটেকশন ==========
+  function protectLink(originalFunction) {
+    return function(...args) {
+      if (!isUser() || isVerified()) {
+        return originalFunction.apply(this, args);
+      }
+
+      pendingLinkCallback = () => {
+        originalFunction.apply(this, args);
+      };
+
+      createModals();
+      showModal('preAuthModal'); // প্রথমে জিজ্ঞাসা
+    };
+  }
+
+  // ========== মূল ফাংশন ওভাররাইড ==========
+  const originalOpenVideoPlayer = window.openVideoPlayer;
+  const originalOpenDrivePlayer = window.openDrivePlayer;
+  const originalTrackAndOpenLink = window.trackAndOpenLink;
+
+  window.openVideoPlayer = protectLink(originalOpenVideoPlayer);
+  window.openDrivePlayer = protectLink(originalOpenDrivePlayer);
+  window.trackAndOpenLink = protectLink(originalTrackAndOpenLink);
+
+  // ========== কার্ড রেন্ডার শেষে লক আইকন আপডেট ==========
+  // রেন্ডার ফাংশনগুলোর শেষে updateLockIcons() কল করতে হবে।
+  // নিচের অংশটি existing renderCards ফাংশনের পর কল করার জন্য।
+  // আপনি চাইলে renderCards ফাংশনের শেষ লাইনে updateLockIcons(); যোগ করতে পারেন।
+  // অথবা পর্যায়ক্রমে setInterval দিয়ে চেক করতে পারেন।
+  setInterval(updateLockIcons, 1000);
+
+  // প্রথমবার মডেল তৈরি
+  createModals();
+})();
+	</script>
+	</textarea>
     <div class="controls">
       <button onclick="selectCode('code10')">Select All</button>
       <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
