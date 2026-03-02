@@ -3640,48 +3640,480 @@ function setupSheets() {
 	<!-- Code 10 -->
   <section class="snippet">
     <h2>Code 15</h2>
-    <div class="subtitle">👉 titel লিখতে হবে</div>
-    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="subtitle">👉 Control Panel 3No appscript code</div>
+    <textarea id="code10" spellcheck="false" wrap="off">
+		// ==3 No==== CONFIG ======
+const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_SHEET3';   // Sheet3 (Login tracker)
+const SHEET_NAME = 'Sheet1';
+
+const MAX_LOGIN = 5;
+
+// Column indexes (0-based)
+const COL_WHATSAPP = 0;   // A
+const COL_PASSWORD = 1;   // B
+const COL_APPROVED = 2;   // C
+const COL_LOGIN_START = 3; // D
+const COL_LOGIN_END = 7;   // H
+
+// ====== UTIL ======
+function respondJson(obj, statusCode) {
+  const response = ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+  if (statusCode) response.setStatusCode(statusCode);
+  return response;
+}
+
+function getSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) throw new Error(`Sheet "${SHEET_NAME}" not found`);
+  return sheet;
+}
+
+// ====== DOGET ======
+function doGet(e) {
+  try {
+    const params = e.parameter || {};
+    const action = params.action;
+
+    if (action === 'getAllRecords') {
+      return handleGetAllRecords();
+    } else if (action === 'getBlockedRecords') {
+      return handleGetBlockedRecords();
+    } else if (action === 'getApprovedRecords') {
+      return handleGetApprovedRecords();
+    } else {
+      return respondJson({ ok: false, error: 'Invalid action' }, 400);
+    }
+  } catch (error) {
+    return respondJson({ ok: false, error: error.message }, 500);
+  }
+}
+
+// ====== DOPOST ======
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents || '{}');
+    const action = data.action;
+
+    if (action === 'revokeAccess') {
+      return handleRevokeAccess(data);
+    } else if (action === 'restoreAccess') {
+      return handleRestoreAccess(data);
+    } else if (action === 'increaseLimit') {
+      return handleIncreaseLimit(data);
+    } else if (action === 'changePassword') {
+      return handleChangePassword(data);
+    } else {
+      return respondJson({ ok: false, error: 'Invalid action' }, 400);
+    }
+  } catch (error) {
+    return respondJson({ ok: false, error: error.message }, 500);
+  }
+}
+
+// ====== HELPER: Extract records with login count ======
+function extractRecords(filterFn) {
+  const sheet = getSheet();
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return [];
+
+  const records = [];
+  for (let i = 1; i < data.length; i++) { // skip header (i=0)
+    const row = data[i];
+    const whatsapp = (row[COL_WHATSAPP] || '').toString().trim();
+    const password = (row[COL_PASSWORD] || '').toString().trim();
+    const approved = (row[COL_APPROVED] || '').toString().trim();
+
+    // Count DONE in login columns
+    let loginCount = 0;
+    for (let col = COL_LOGIN_START; col <= COL_LOGIN_END; col++) {
+      if ((row[col] || '').toString().trim().toUpperCase() === 'DONE') loginCount++;
+    }
+
+    const record = {
+      row: i + 1,  // 1-based row number for later updates
+      whatsapp: whatsapp,
+      password: password,
+      approved: approved,
+      loginCount: loginCount,
+      maxLogins: MAX_LOGIN
+    };
+
+    if (filterFn(record)) records.push(record);
+  }
+  return records;
+}
+
+// ====== HANDLERS ======
+
+function handleGetAllRecords() {
+  const records = extractRecords(() => true);
+  return respondJson({ ok: true, data: records });
+}
+
+function handleGetBlockedRecords() {
+  const records = extractRecords(r => r.approved === 'BLOCKED');
+  return respondJson({ ok: true, data: records });
+}
+
+function handleGetApprovedRecords() {
+  const records = extractRecords(r => r.approved === 'APPROVED');
+  return respondJson({ ok: true, data: records });
+}
+
+/** Revoke access: set approved column to 'BLOCKED' */
+function handleRevokeAccess(data) {
+  const { whatsapp } = data;
+  if (!whatsapp) throw new Error('Missing whatsapp');
+
+  const sheet = getSheet();
+  const dataRange = sheet.getDataRange();
+  const values = dataRange.getValues();
+
+  for (let i = 1; i < values.length; i++) {
+    const rowWhatsapp = (values[i][COL_WHATSAPP] || '').toString().trim();
+    if (rowWhatsapp === whatsapp) {
+      const targetRow = i + 1;
+      const cell = sheet.getRange(targetRow, COL_APPROVED + 1);
+      cell.setNumberFormat('@'); // ensure text
+      cell.setValue('BLOCKED');
+      return respondJson({ ok: true, message: 'Access revoked' });
+    }
+  }
+
+  throw new Error('WhatsApp number not found');
+}
+
+/** Restore access: set approved column to 'APPROVED' */
+function handleRestoreAccess(data) {
+  const { whatsapp } = data;
+  if (!whatsapp) throw new Error('Missing whatsapp');
+
+  const sheet = getSheet();
+  const dataRange = sheet.getDataRange();
+  const values = dataRange.getValues();
+
+  for (let i = 1; i < values.length; i++) {
+    const rowWhatsapp = (values[i][COL_WHATSAPP] || '').toString().trim();
+    if (rowWhatsapp === whatsapp) {
+      const targetRow = i + 1;
+      const cell = sheet.getRange(targetRow, COL_APPROVED + 1);
+      cell.setNumberFormat('@');
+      cell.setValue('APPROVED');
+      return respondJson({ ok: true, message: 'Access restored' });
+    }
+  }
+
+  throw new Error('WhatsApp number not found');
+}
+
+/** Increase remaining limit: remove the rightmost DONE (decrement login count) */
+function handleIncreaseLimit(data) {
+  const { whatsapp } = data;
+  if (!whatsapp) throw new Error('Missing whatsapp');
+
+  const sheet = getSheet();
+  const dataRange = sheet.getDataRange();
+  const values = dataRange.getValues();
+
+  for (let i = 1; i < values.length; i++) {
+    const rowWhatsapp = (values[i][COL_WHATSAPP] || '').toString().trim();
+    if (rowWhatsapp === whatsapp) {
+      const targetRow = i + 1;
+
+      // Find the rightmost column (from H down to D) that contains 'DONE'
+      for (let col = COL_LOGIN_END; col >= COL_LOGIN_START; col--) {
+        const cell = sheet.getRange(targetRow, col + 1);
+        const val = (cell.getValue() || '').toString().trim().toUpperCase();
+        if (val === 'DONE') {
+          cell.clearContent(); // remove the DONE
+          return respondJson({ ok: true, message: 'Limit increased (one login removed)' });
+        }
+      }
+
+      // No DONE found
+      return respondJson({ ok: false, message: 'No logins to remove' });
+    }
+  }
+
+  throw new Error('WhatsApp number not found');
+}
+
+/** Change password for a student */
+function handleChangePassword(data) {
+  const { whatsapp, newPassword } = data;
+  if (!whatsapp || !newPassword) throw new Error('Missing whatsapp or newPassword');
+
+  const sheet = getSheet();
+  const dataRange = sheet.getDataRange();
+  const values = dataRange.getValues();
+
+  for (let i = 1; i < values.length; i++) {
+    const rowWhatsapp = (values[i][COL_WHATSAPP] || '').toString().trim();
+    if (rowWhatsapp === whatsapp) {
+      const targetRow = i + 1;
+      const cell = sheet.getRange(targetRow, COL_PASSWORD + 1);
+      cell.setNumberFormat('@');
+      cell.setValue(newPassword);
+      return respondJson({ ok: true, message: 'Password changed' });
+    }
+  }
+
+  throw new Error('WhatsApp number not found');
+}
+
+// ====== OPTIONAL: Setup headers ======
+function setupSheet() {
+  const sheet = getSheet();
+  if (sheet.getLastRow() === 0) {
+    const headers = ['WhatsApp', 'Password', 'Approved', 'Login1', 'Login2', 'Login3', 'Login4', 'Login5'];
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#4a86e8').setFontColor('white');
+  }
+  return ContentService.createTextOutput('Tracker sheet setup completed');
+}
+	</textarea>
     <div class="controls">
-      <button onclick="selectCode('code10')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+      <button onclick="selectCode('code15')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code15')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code15')">Download</button>
     </div>
   </section>
 
 	<!-- Code 10 -->
   <section class="snippet">
     <h2>Code 16</h2>
-    <div class="subtitle">👉 titel লিখতে হবে</div>
-    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="subtitle">👉 Control Panel 4No appscript code</div>
+    <textarea id="code16" spellcheck="false" wrap="off">
+		// ==4 No==== CONFIG ======
+const SPREADSHEET_ID = '1rHp_JI38cJvq_SfQJ1YVKfVmszNUpMkcCDplPCQ2lI4';   // আপনার ১ নম্বর শীটের ID
+const SHEET_NAME = 'Sheet1';
+
+// Column indexes (0-based)
+const COL_TIMESTAMP = 0;   // A
+const COL_SUBJECT   = 1;   // B
+const COL_LINK      = 2;   // C
+const COL_TITLE     = 3;   // D
+
+// ====== UTIL ======
+function respondJson(obj, statusCode) {
+  const response = ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+  if (statusCode) response.setStatusCode(statusCode);
+  return response;
+}
+
+function getSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) throw new Error(`Sheet "${SHEET_NAME}" not found`);
+  return sheet;
+}
+
+// ====== DOPOST ======
+function doPost(e) {
+  try {
+    // পোস্ট ডাটা পার্স করুন
+    const data = JSON.parse(e.postData.contents || '{}');
+    const action = data.action;
+
+    if (action === 'addClass') {
+      return handleAddClass(data);
+    } else {
+      return respondJson({ ok: false, error: 'Invalid action' }, 400);
+    }
+  } catch (error) {
+    return respondJson({ ok: false, error: error.toString() }, 500);
+  }
+}
+
+// ====== DOGET (OPTIONAL) ======
+function doGet(e) {
+  return respondJson({ ok: true, message: 'Service is running' });
+}
+
+// ====== HANDLER ======
+function handleAddClass(data) {
+  const { subjectFinal, link, titleFinal } = data;
+  
+  // বাধ্যতামূলক ফিল্ড চেক
+  if (!subjectFinal || !link || !titleFinal) {
+    throw new Error('Missing required fields');
+  }
+
+  const sheet = getSheet();
+  const nextRow = sheet.getLastRow() + 1;
+
+  // টাইমস্ট্যাম্প (A)
+  const timestampCell = sheet.getRange(nextRow, COL_TIMESTAMP + 1);
+  timestampCell.setValue(new Date());
+  timestampCell.setNumberFormat('M/d/yyyy H:mm:ss');
+
+  // সাবজেক্ট (B) – টেক্সট ফরম্যাট
+  const subjectCell = sheet.getRange(nextRow, COL_SUBJECT + 1);
+  subjectCell.setNumberFormat('@');
+  subjectCell.setValue(subjectFinal);
+
+  // লিংক (C) – টেক্সট ফরম্যাট
+  const linkCell = sheet.getRange(nextRow, COL_LINK + 1);
+  linkCell.setNumberFormat('@');
+  linkCell.setValue(link);
+
+  // টাইটেল (D) – টেক্সট ফরম্যাট
+  const titleCell = sheet.getRange(nextRow, COL_TITLE + 1);
+  titleCell.setNumberFormat('@');
+  titleCell.setValue(titleFinal);
+
+  return respondJson({ ok: true, message: 'Class added successfully' });
+}
+
+// ====== SETUP ======
+function setupSheet() {
+  const sheet = getSheet();
+  if (sheet.getLastRow() === 0) {
+    const headers = ['Timestamp', 'Subject', 'Class Link', 'Class Title'];
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length)
+      .setFontWeight('bold')
+      .setBackground('#4a86e8')
+      .setFontColor('white');
+  }
+  return ContentService.createTextOutput('Setup completed');
+}
+	</textarea>
     <div class="controls">
-      <button onclick="selectCode('code10')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+      <button onclick="selectCode('code16')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code16')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code16')">Download</button>
     </div>
   </section>
 
 	<!-- Code 10 -->
   <section class="snippet">
     <h2>Code 17</h2>
-    <div class="subtitle">👉 titel লিখতে হবে</div>
-    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="subtitle">👉 Control Panel 5No appscript code</div>
+    <textarea id="code17" spellcheck="false" wrap="off">
+		// ===5 No=== CONFIG ======
+const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_FOR_REGISTRATION';   // আপনার রেজিস্ট্রেশন শীটের ID দিন (যেখানে Timestamp, WhatsApp, Password, Name থাকবে)
+const SHEET_NAME = 'Sheet1';
+
+// Column indexes (0-based)
+const COL_TIMESTAMP = 0;   // A
+const COL_WHATSAPP  = 1;   // B
+const COL_PASSWORD  = 2;   // C
+const COL_NAME      = 3;   // D
+
+// ====== UTIL ======
+function respondJson(obj, statusCode) {
+  const response = ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+  if (statusCode) response.setStatusCode(statusCode);
+  return response;
+}
+
+function getSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) throw new Error(`Sheet "${SHEET_NAME}" not found`);
+  return sheet;
+}
+
+// ====== DOPOST ======
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents || '{}');
+    const action = data.action;
+
+    if (action === 'registerStudent') {
+      return handleRegisterStudent(data);
+    } else {
+      return respondJson({ ok: false, error: 'Invalid action' }, 400);
+    }
+  } catch (error) {
+    return respondJson({ ok: false, error: error.toString() }, 500);
+  }
+}
+
+// ====== DOGET (optional) ======
+function doGet(e) {
+  return respondJson({ ok: true, message: 'Registration service is running' });
+}
+
+// ====== HANDLER ======
+function handleRegisterStudent(data) {
+  const { name, whatsapp, password } = data;
+
+  // বাধ্যতামূলক ফিল্ড চেক
+  if (!name || !whatsapp || !password) {
+    throw new Error('Missing required fields');
+  }
+
+  const sheet = getSheet();
+  const nextRow = sheet.getLastRow() + 1;
+
+  // টাইমস্ট্যাম্প (A)
+  const timestampCell = sheet.getRange(nextRow, COL_TIMESTAMP + 1);
+  timestampCell.setValue(new Date());
+  timestampCell.setNumberFormat('M/d/yyyy H:mm:ss');   // যেমন 2/18/2026 19:15:41
+
+  // হোয়াটসঅ্যাপ (B) – টেক্সট ফরম্যাট (শুরুতে 0 সংরক্ষণের জন্য)
+  const whatsappCell = sheet.getRange(nextRow, COL_WHATSAPP + 1);
+  whatsappCell.setNumberFormat('@');
+  whatsappCell.setValue(whatsapp);
+
+  // পাসওয়ার্ড (C) – টেক্সট ফরম্যাট (শুরুতে 0 থাকলে সংরক্ষণ হবে)
+  const passwordCell = sheet.getRange(nextRow, COL_PASSWORD + 1);
+  passwordCell.setNumberFormat('@');
+  passwordCell.setValue(password);
+
+  // নাম (D) – টেক্সট ফরম্যাট
+  const nameCell = sheet.getRange(nextRow, COL_NAME + 1);
+  nameCell.setNumberFormat('@');
+  nameCell.setValue(name);
+
+  return respondJson({ ok: true, message: 'Registration successful' });
+}
+
+// ====== SETUP (ঐচ্ছিক) ======
+function setupSheet() {
+  const sheet = getSheet();
+  if (sheet.getLastRow() === 0) {
+    const headers = ['Timestamp', 'WhatsApp', 'Password', 'Name'];
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length)
+      .setFontWeight('bold')
+      .setBackground('#4a86e8')
+      .setFontColor('white');
+  }
+  return ContentService.createTextOutput('Setup completed');
+}
+	</textarea>
     <div class="controls">
-      <button onclick="selectCode('code10')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+      <button onclick="selectCode('code17')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code17')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code17')">Download</button>
     </div>
   </section>
 
 	<!-- Code 10 -->
   <section class="snippet">
     <h2>Code 18</h2>
-    <div class="subtitle">👉 titel লিখতে হবে</div>
-    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="subtitle">👉 যেই কোড সংশধনের মাধ্যমে do post এর failed to fatch সমস্যা ঠিক হয়েছিলো</div>
+    <textarea id="code18" spellcheck="false" wrap="off">
+		async function apiPost(baseUrl, payload) {
+  const res = await fetch(baseUrl, {
+    method: 'POST',
+    body: JSON.stringify(payload)   // Content-Type হেডার ছাড়া
+  });
+  if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+  return res.json();
+}
+	</textarea>
     <div class="controls">
-      <button onclick="selectCode('code10')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+      <button onclick="selectCode('code18')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code18')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code18')">Download</button>
     </div>
   </section>
 
