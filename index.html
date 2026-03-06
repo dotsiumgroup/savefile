@@ -4120,6 +4120,225 @@ function setupSheet() {
 	<!-- Code 10 -->
   <section class="snippet">
     <h2>Code 19</h2>
+    <div class="subtitle">LIVE page traker appscript code</div>
+    <textarea id="code19" spellcheck="false" wrap="off">
+		// ===== Tracking System for Live Class Viewer Count =====
+const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE';   // Replace with your Google Sheet ID
+const SHEET_NAME = 'Sheet1';                          // Sheet name where data will be stored
+
+// Column indexes (0-based)
+const COL_TIMESTAMP = 0;      // A
+const COL_NAME = 1;           // B
+const COL_TRACKING_ID = 2;    // C
+const COL_ACTIVE = 3;         // D
+const COL_LAST_HEARTBEAT = 4; // E
+
+// ====== UTIL ======
+function respondJson(obj, statusCode) {
+  const response = ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+  if (statusCode) response.setStatusCode(statusCode);
+  return response;
+}
+
+function getSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) throw new Error(`Sheet "${SHEET_NAME}" not found`);
+  return sheet;
+}
+
+function ensureHeaders() {
+  const sheet = getSheet();
+  if (sheet.getLastRow() === 0) {
+    const headers = ['Timestamp', 'Name', 'TrackingId', 'Active', 'LastHeartbeat'];
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length)
+      .setFontWeight('bold')
+      .setBackground('#4a86e8')
+      .setFontColor('white');
+  }
+}
+
+// ====== DOGET ======
+function doGet(e) {
+  try {
+    ensureHeaders();
+    const params = e.parameter || {};
+    const action = params.action;
+
+    if (action === 'getActiveCount') {
+      return handleGetActiveCount();
+    } else {
+      return respondJson({ ok: false, error: 'Invalid action' }, 400);
+    }
+  } catch (error) {
+    return respondJson({ ok: false, error: error.message }, 500);
+  }
+}
+
+// ====== DOPOST ======
+function doPost(e) {
+  try {
+    ensureHeaders();
+    const data = JSON.parse(e.postData.contents || '{}');
+    const action = data.action;
+
+    if (action === 'register') {
+      return handleRegister(data);
+    } else if (action === 'heartbeat') {
+      return handleHeartbeat(data);
+    } else if (action === 'setInactive') {
+      return handleSetInactive(data);
+    } else {
+      return respondJson({ ok: false, error: 'Invalid action' }, 400);
+    }
+  } catch (error) {
+    return respondJson({ ok: false, error: error.message }, 500);
+  }
+}
+
+// ====== HANDLERS ======
+
+/** Register a new user */
+function handleRegister(data) {
+  const { name, trackingId } = data;
+  if (!name || !trackingId) throw new Error('Missing name or trackingId');
+
+  const sheet = getSheet();
+  const now = new Date();
+
+  // Check if trackingId already exists – if yes, update instead of adding new row?
+  // We'll add a new row for simplicity; duplicates are possible but rare.
+  sheet.appendRow([now, name, trackingId, 'ACTIVE', now]);
+
+  return respondJson({ ok: true, message: 'Registered successfully' });
+}
+
+/** Update heartbeat and set active */
+function handleHeartbeat(data) {
+  const { trackingId } = data;
+  if (!trackingId) throw new Error('Missing trackingId');
+
+  const sheet = getSheet();
+  const dataRange = sheet.getDataRange();
+  const values = dataRange.getValues();
+  const now = new Date();
+
+  let rowUpdated = false;
+  for (let i = 1; i < values.length; i++) { // skip header
+    if ((values[i][COL_TRACKING_ID] || '').toString() === trackingId) {
+      const row = i + 1;
+      sheet.getRange(row, COL_ACTIVE + 1).setValue('ACTIVE');
+      sheet.getRange(row, COL_LAST_HEARTBEAT + 1).setValue(now);
+      rowUpdated = true;
+      break;
+    }
+  }
+
+  if (!rowUpdated) {
+    // If not found, maybe add as new? But better to ignore.
+    return respondJson({ ok: false, error: 'Tracking ID not found' }, 404);
+  }
+
+  return respondJson({ ok: true });
+}
+
+/** Manually set inactive (e.g., on pause/exit) */
+function handleSetInactive(data) {
+  const { trackingId } = data;
+  if (!trackingId) throw new Error('Missing trackingId');
+
+  const sheet = getSheet();
+  const dataRange = sheet.getDataRange();
+  const values = dataRange.getValues();
+
+  for (let i = 1; i < values.length; i++) {
+    if ((values[i][COL_TRACKING_ID] || '').toString() === trackingId) {
+      const row = i + 1;
+      sheet.getRange(row, COL_ACTIVE + 1).setValue('NON ACTIVE');
+      break;
+    }
+  }
+
+  return respondJson({ ok: true });
+}
+
+/** Get count of active viewers */
+function handleGetActiveCount() {
+  const sheet = getSheet();
+  const dataRange = sheet.getDataRange();
+  const values = dataRange.getValues();
+
+  let activeCount = 0;
+  const now = new Date();
+  const inactiveThreshold = 6 * 60 * 1000; // 6 minutes
+
+  // First pass: update rows where last heartbeat is older than threshold
+  for (let i = 1; i < values.length; i++) {
+    const lastHeartbeat = values[i][COL_LAST_HEARTBEAT];
+    if (lastHeartbeat && lastHeartbeat instanceof Date) {
+      if (now - lastHeartbeat > inactiveThreshold) {
+        const row = i + 1;
+        sheet.getRange(row, COL_ACTIVE + 1).setValue('NON ACTIVE');
+        values[i][COL_ACTIVE] = 'NON ACTIVE'; // update local copy
+      }
+    }
+  }
+
+  // Second pass: count active
+  for (let i = 1; i < values.length; i++) {
+    if ((values[i][COL_ACTIVE] || '').toString().toUpperCase() === 'ACTIVE') {
+      activeCount++;
+    }
+  }
+
+  return respondJson({ ok: true, count: activeCount });
+}
+
+// ====== OPTIONAL: Setup trigger for periodic cleanup ======
+// You can set a time-driven trigger to call cleanupInactive() every 5-10 minutes.
+function cleanupInactive() {
+  const sheet = getSheet();
+  const dataRange = sheet.getDataRange();
+  const values = dataRange.getValues();
+  const now = new Date();
+  const inactiveThreshold = 6 * 60 * 1000; // 6 minutes
+
+  for (let i = 1; i < values.length; i++) {
+    const lastHeartbeat = values[i][COL_LAST_HEARTBEAT];
+    if (lastHeartbeat && lastHeartbeat instanceof Date) {
+      if (now - lastHeartbeat > inactiveThreshold) {
+        const row = i + 1;
+        sheet.getRange(row, COL_ACTIVE + 1).setValue('NON ACTIVE');
+      }
+    }
+  }
+}
+	</textarea>
+    <div class="controls">
+      <button onclick="selectCode('code19')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code19')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code19')">Download</button>
+    </div>
+  </section>
+
+  <!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 20</h2>
+    <div class="subtitle">LIVE Comments appscript code</div>
+    <textarea id="code20" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="controls">
+      <button onclick="selectCode('code20')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code20')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code20')">Download</button>
+    </div>
+  </section>
+
+			
+<!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 20</h2>
     <div class="subtitle">👉 titel লিখতে হবে</div>
     <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
     <div class="controls">
@@ -4128,8 +4347,7 @@ function setupSheet() {
       <button class="btn-green" onclick="downloadCode('code10')">Download</button>
     </div>
   </section>
-
-  <!-- Code 10 -->
+			<!-- Code 10 -->
   <section class="snippet">
     <h2>Code 20</h2>
     <div class="subtitle">👉 titel লিখতে হবে</div>
@@ -4141,6 +4359,94 @@ function setupSheet() {
     </div>
   </section>
 
+			<!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 20</h2>
+    <div class="subtitle">👉 titel লিখতে হবে</div>
+    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="controls">
+      <button onclick="selectCode('code10')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+    </div>
+  </section>
+
+			<!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 20</h2>
+    <div class="subtitle">👉 titel লিখতে হবে</div>
+    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="controls">
+      <button onclick="selectCode('code10')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+    </div>
+  </section>
+
+			<!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 20</h2>
+    <div class="subtitle">👉 titel লিখতে হবে</div>
+    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="controls">
+      <button onclick="selectCode('code10')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+    </div>
+  </section>
+
+			<!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 20</h2>
+    <div class="subtitle">👉 titel লিখতে হবে</div>
+    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="controls">
+      <button onclick="selectCode('code10')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+    </div>
+  </section>
+
+			<!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 20</h2>
+    <div class="subtitle">👉 titel লিখতে হবে</div>
+    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="controls">
+      <button onclick="selectCode('code10')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+    </div>
+  </section>
+
+			<!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 20</h2>
+    <div class="subtitle">👉 titel লিখতে হবে</div>
+    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="controls">
+      <button onclick="selectCode('code10')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+    </div>
+  </section>
+
+			<!-- Code 10 -->
+  <section class="snippet">
+    <h2>Code 20</h2>
+    <div class="subtitle">👉 titel লিখতে হবে</div>
+    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <div class="controls">
+      <button onclick="selectCode('code10')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+    </div>
+  </section>
+
+
+
+
+			
   <script>
     function selectCode(id){
       const ta = document.getElementById(id);
