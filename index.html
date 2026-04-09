@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>10 Code Store — Sahibul Musa Sium</title>
+  <title>Code Store — Sahibul Musa Sium</title>
   <style>
     body { font-family: system-ui, Arial; margin:0; padding:20px; background:#f5f7fb; color:#111; }
     h1 { font-size:22px; margin-bottom:20px; text-align:center; }
@@ -4411,26 +4411,273 @@ function cleanupInactive() {
   </section>
 
 			
-<!-- Code 10 -->
+<!-- Code 21 -->
   <section class="snippet">
-    <h2>Code 20</h2>
-    <div class="subtitle">👉 titel লিখতে হবে</div>
-    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <h2>Code 21</h2>
+    <div class="subtitle">👉 Drive folder to sheet project</div>
+    <textarea id="code21" spellcheck="false" wrap="off">
+		function syncDriveFolderToSheet() {
+  const FOLDER_URL = 'https://drive.google.com/drive/folders/17hCHfLGiZhn993DtYY_SYNOhbobAJWafl1MJIhfiSc_MSLnObACMzsWYZRAztuTUJLLbKCHV';
+  const SPREADSHEET_ID = '1SxIbcjLiUSm5a8uRcUbxrzHRkrpOXg3n4kvLxkjL2EQ';  // নতুন শীট আইডি
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getActiveSheet();
+
+  // ফোল্ডার আইডি বের করা
+  const folderId = extractFolderId_(FOLDER_URL);
+  if (!folderId) {
+    SpreadsheetApp.getUi().alert('ভালো ফোল্ডার লিংক দিন');
+    return;
+  }
+
+  const folder = DriveApp.getFolderById(folderId);
+  
+  // ফোল্ডারের সব ফাইলের লিংক সংগ্রহ (সেট)
+  const folderFiles = [];
+  const files = folder.getFiles();
+  while (files.hasNext()) {
+    const file = files.next();
+    folderFiles.push(file.getUrl());
+  }
+  const folderLinkSet = new Set(folderFiles);
+
+  // ---------- ডিলিট অংশ: শুধু এই ফোল্ডার আইডির সারি থেকে ফোল্ডারে নেই এমন লিংক মুছুন ----------
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    // কলাম A:G (7 কলাম)
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, 7);
+    const data = dataRange.getValues();
+
+    for (let i = data.length - 1; i >= 0; i--) {
+      const row = data[i];
+      const link = row[2];       // কলাম C (লিংক)
+      const sourceFolderId = row[6];     // কলাম G (সোর্স ফোল্ডার আইডি)
+      // শুধু এই ফোল্ডার আইডির সারি চেক করুন
+      if (sourceFolderId === folderId && !folderLinkSet.has(link)) {
+        sheet.deleteRow(i + 2);
+      }
+    }
+  }
+
+  // ---------- নতুন যোগ অংশ: ফোল্ডারের ফাইল যা শীটে নেই এবং {} আছে ----------
+  let existingLinks = [];
+  if (sheet.getLastRow() > 1) {
+    existingLinks = sheet
+      .getRange(2, 3, sheet.getLastRow() - 1, 1)
+      .getValues()
+      .flat();
+  }
+
+  // শুধুমাত্র {} প্যাটার্ন (সাবজেক্ট বের করার জন্য)
+  const subjectPattern = /\{([^}]+)\}/;
+  // টাইপ বের করার জন্য [] প্যাটার্ন (মিশন/ডকুমেন্ট)
+  const typePattern = /\[([^\]]+)\]/;
+
+  const filesAgain = folder.getFiles();
+  while (filesAgain.hasNext()) {
+    const file = filesAgain.next();
+    const fileUrl = file.getUrl();
+
+    // আগে থেকে থাকলে বাদ
+    if (existingLinks.includes(fileUrl)) continue;
+
+    const originalName = file.getName();
+
+    // সাবজেক্ট বের করুন (শুধু {} থেকে)
+    const subjectMatch = originalName.match(subjectPattern);
+    if (!subjectMatch) {
+      // {} নেই → এই ফাইল ইগনোর করুন
+      continue;
+    }
+    let subject = subjectMatch[1].trim();
+
+    // টাইপ বের করুন ([] থেকে)
+    let typeWord = 'ডকুমেন্ট'; // ডিফল্ট
+    const typeMatch = originalName.match(typePattern);
+    if (typeMatch) {
+      const typeText = typeMatch[1].trim();
+      if (typeText === 'মিশন') typeWord = 'মিশন';
+      else if (typeText === 'ডকুমেন্ট') typeWord = 'ডকুমেন্ট';
+      // অন্য কোনো শব্দ এলে ডিফল্ট 'ডকুমেন্ট' থাকবে
+    }
+    subject = subject + ' (' + typeWord + ')';
+
+    // পরিষ্কার নাম তৈরি করুন: {} ও [] বাদ দিন, শেষের নির্দিষ্ট শব্দ কাটুন
+    let cleanName = originalName
+      .replace(subjectPattern, '')
+      .replace(typePattern, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    cleanName = removeTrailingInstructor_(cleanName);
+    cleanName = removeExtension_(cleanName);
+
+    const dateCreated = file.getDateCreated();
+    const formattedDate = Utilities.formatDate(
+      dateCreated,
+      Session.getScriptTimeZone(),
+      "M/d/yyyy HH:mm:ss"
+    );
+
+    // এখন সারিতে ৭টি কলাম: A, B, C, D, E(ফাঁকা), F(ফাঁকা), G(ফোল্ডার আইডি)
+    sheet.appendRow([
+      formattedDate,  // A
+      subject,        // B
+      fileUrl,        // C
+      cleanName,      // D
+      '',             // E (ফাঁকা)
+      '',             // F (ফাঁকা)
+      folderId        // G (সোর্স ফোল্ডার আইডি)
+    ]);
+  }
+}
+
+// ফোল্ডারের লিংক থেকে আইডি বের করার ফাংশন
+function extractFolderId_(url) {
+  const patterns = [
+    /\/folders\/([a-zA-Z0-9_-]+)/,
+    /id=([a-zA-Z0-9_-]+)/
+  ];
+  for (let pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+// শেষের নির্দিষ্ট শব্দ থাকলেই কাটবে, অন্যথায় কাটবে না
+function removeTrailingInstructor_(name) {
+  const lastHyphenIndex = name.lastIndexOf(' - ');
+  if (lastHyphenIndex === -1) return name;
+  
+  const suffix = name.substring(lastHyphenIndex + 3).trim(); // ' - ' এর পরের অংশ
+  const allowedSuffixes = [
+    'Bangladesh Online Madrasah',
+    'Sahibul Musa Sium',
+    'Sahibul Musa Siam',
+    'Riad Hasan'
+  ];
+  
+  if (allowedSuffixes.includes(suffix)) {
+    return name.substring(0, lastHyphenIndex).trim();
+  }
+  return name;
+}
+
+// এক্সটেনশন বাদ দেয়
+function removeExtension_(filename) {
+  const lastDotIndex = filename.lastIndexOf('.');
+  if (lastDotIndex > 0) {
+    return filename.substring(0, lastDotIndex);
+  }
+  return filename;
+}
+	</textarea>
     <div class="controls">
-      <button onclick="selectCode('code10')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+      <button onclick="selectCode('code21')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code21')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code21')">Download</button>
     </div>
   </section>
-			<!-- Code 10 -->
+			<!-- Code 22 -->
   <section class="snippet">
-    <h2>Code 20</h2>
+    <h2>Code 22</h2>
     <div class="subtitle">👉 titel লিখতে হবে</div>
-    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <textarea id="code22" spellcheck="false" wrap="off">
+		// ===================== কনফিগারেশন =====================
+const SPREADSHEET_ID = '1CRMYdLBG4SENhLdWVKqofmVH9ChUK8A48oxPIg_-M3s';  // আপনার শীটের আইডি
+const SHEET_NAME = 'Sheet1';  // ← আপনার শীটের নাম দিন (যদি ভিন্ন হয় তাহলে পরিবর্তন করুন)
+
+/**
+ * মূল ফাংশন: বর্তমান সময় থেকে ১৫ দিন আগের টাইম চেক করে নির্দিষ্ট কাজ করবে
+ */
+function autoReplyBasedOnTime() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    Logger.log(`"${SHEET_NAME}" নামে কোনো শীট পাওয়া যায়নি।`);
+    return;
+  }
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;  // হেডার ছাড়া কোনো ডেটা নেই (ধরে নিচ্ছি ১নং সারি হেডার)
+
+  const now = new Date();
+  const fifteenDaysAgo = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
+
+  // ডেটা রেঞ্জ (কলাম A থেকে K পর্যন্ত, সারি 2 থেকে শুরু)
+  const dataRange = sheet.getRange(2, 1, lastRow - 1, 11);
+  const data = dataRange.getValues();
+
+  const outputData = [];
+
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    const timeValue = row[0];  // কলাম A
+    let isOld = false;
+
+    // টাইম চেক করা (Date Object অথবা String)
+    if (timeValue instanceof Date) {
+      isOld = timeValue <= fifteenDaysAgo;
+    } else if (typeof timeValue === 'string') {
+      const parsed = new Date(timeValue);
+      if (!isNaN(parsed.getTime())) isOld = parsed <= fifteenDaysAgo;
+    }
+
+    // লক্ষ্য কলামগুলোর বর্তমান মান (F, G, H, I, J, K) – index: F=5, G=6, H=7, I=8, J=9, K=10
+    const colF = row[5];
+    const colG = row[6];
+    const colH = row[7];
+    const colI = row[8];
+    const colJ = row[9];
+    const colK = row[10];
+
+    const targetEmpty = (colF === "" || colF === null) &&
+                        (colG === "" || colG === null) &&
+                        (colH === "" || colH === null) &&
+                        (colI === "" || colI === null) &&
+                        (colJ === "" || colJ === null) &&
+                        (colK === "" || colK === null);
+
+    if (isOld && targetEmpty) {
+      // নতুন সারি তৈরি (পুরানোটির কপি)
+      const newRow = [...row];
+      newRow[5] = "BOM App : Auto Reply System";           // F
+      newRow[6] = row[1];                                  // B → G
+      newRow[7] = row[2];                                  // C → H
+      newRow[8] = row[3];                                  // D → I
+      newRow[9] = getAutoReplyMessage_();                  // J (বাংলা মেসেজ)
+      newRow[10] = row[4];                                 // E → K
+      outputData.push(newRow);
+    } else {
+      outputData.push(row);  // অপরিবর্তিত রাখো
+    }
+  }
+
+  // পরিবর্তিত ডেটা আবার শীটে লেখা
+  if (outputData.length > 0) {
+    sheet.getRange(2, 1, outputData.length, 11).setValues(outputData);
+  }
+}
+
+/**
+ * হেল্পার ফাংশন: নির্দিষ্ট বাংলা মেসেজ রিটার্ন করে
+ */
+function getAutoReplyMessage_() {
+  return `প্রিয় শিক্ষার্থী! আপনি বেশ কিছুদিন আগে আমাদের কাছে উক্ত কমেন্টি করেছিলেন। কিন্তু এখন পর্যন্ত কোন এডমিন এই কমেন্টের কোন প্রকার রিপ্লাই করেননি। তাই আমরা এই স্বয়ংক্রিয় মেসেজটি আপনাকে পাঠালাম। এই কমেন্টি যদি App এর প্রগ্রাম জাতীয় কোনো সমস্যা নিয়ে হয় তাহলে পুনরায় নতুন করে কমেন্ট করুন। 
+
+অথবা আপনার কমেন্টে যদি কোন বিশেষ চাহিদা বা তথ্য জানার বিষয় থাকে তাহলে সরাসরি উক্ত কমেন্টি BOM এর অফিসিয়াল হোয়াটসঅ্যাপ এ বলুন। আশা করি আপনি সমাধানটি পেয়ে যাবেন। ধন্যবাদ সাথেই থাকুন।❤️❤️`;
+}
+
+// (ঐচ্ছিক) ম্যানুয়ালি চালানোর জন্য মেনু তৈরি করতে চাইলে নিচের অংশটি যোগ করুন
+function onOpen() {
+  const ui = SpreadsheetApp.openById(SPREADSHEET_ID).getUi();
+  ui.createMenu('📅 অটো রিপ্লাই')
+    .addItem('এখনই চেক ও আপডেট করুন', 'autoReplyBasedOnTime')
+    .addToUi();
+}
+	</textarea>
     <div class="controls">
-      <button onclick="selectCode('code10')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+      <button onclick="selectCode('code22')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code22')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code22')">Download</button>
     </div>
   </section>
 
