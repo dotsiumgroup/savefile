@@ -4802,13 +4802,198 @@ function onOpen() {
 
 			<!-- Code 10 -->
   <section class="snippet">
-    <h2>Code 20</h2>
-    <div class="subtitle">👉 titel লিখতে হবে</div>
-    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <h2>Code 23</h2>
+    <div class="subtitle">👉 Drive to sheet with (ডকুমেন্ট) & ডাবল ফোল্ডার ও অটো পরিবর্তন সাপোর্ট </div>
+    <textarea id="code23" spellcheck="false" wrap="off">
+		function syncDriveFolderToSheet() {
+  const FOLDER_URL = 'https://drive.google.com/drive/folders/1muMYLzPCkievJH5eDGCl9HtCkRnbPWHE?usp=drive_link';
+  const SPREADSHEET_ID = '1kqqyAALSy1qCvZaRHRD84qnL1IBBdfxhCwaYb58FH1Q';
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getActiveSheet();
+
+  // ফোল্ডার আইডি বের করা
+  const folderId = extractFolderId_(FOLDER_URL);
+  if (!folderId) {
+    SpreadsheetApp.getUi().alert('ভালো ফোল্ডার লিংক দিন');
+    return;
+  }
+
+  const mainFolder = DriveApp.getFolderById(folderId);
+  const subfolders = mainFolder.getFolders();
+
+  // ---------- ড্রাইভ থেকে বর্তমান ডেটা সংগ্রহ (সাবজেক্ট ও ফাইল) ----------
+  const driveFileMap = new Map(); // key = fileUrl, value = { subject, cleanName }
+
+  while (subfolders.hasNext()) {
+    const subfolder = subfolders.next();
+    const folderName = subfolder.getName();
+    // চাহিদা ১: সাবজেক্টের সাথে (ডকুমেন্ট) যোগ করা
+    const subject = folderName + ' (ডকুমেন্ট)';
+
+    const files = subfolder.getFiles();
+    while (files.hasNext()) {
+      const file = files.next();
+      const fileUrl = file.getUrl();
+
+      // পরিষ্কার নাম তৈরি (এক্সটেনশন, প্রশিক্ষকের নাম, "Copy of" বাদ)
+      let cleanName = file.getName();
+      cleanName = removeTrailingInstructor_(cleanName);
+      cleanName = removeExtension_(cleanName);
+      cleanName = removeCopyPrefix_(cleanName);   // চাহিদা ২
+
+      driveFileMap.set(fileUrl, {
+        subject: subject,
+        cleanName: cleanName
+      });
+    }
+  }
+
+  // ---------- শীটে বিদ্যমান ডেটা পড়া (শুধু এই মূল ফোল্ডারের জন্য) ----------
+  const sheetRowMap = new Map(); // key = fileUrl, value = { rowIndex, subject, cleanName }
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, 7);
+    const data = dataRange.getValues();
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      const sourceFolderId = row[6]; // কলাম G
+      if (sourceFolderId === folderId) {
+        const fileUrl = row[2];       // কলাম C
+        if (fileUrl) {
+          sheetRowMap.set(fileUrl, {
+            rowIndex: i + 2,          // প্রকৃত সারি নম্বর
+            subject: row[1],          // কলাম B
+            cleanName: row[3]         // কলাম D
+          });
+        }
+      }
+    }
+  }
+
+  // ---------- আপডেট ও নতুন সংযোজন (চাহিদা ৩) ----------
+  const rowsToDelete = new Set(); // যে সারিগুলো ডিলিট হবে
+
+  // প্রথমে বিদ্যমান সারি চেক করা (আপডেট ও ডিলিট চিহ্নিতকরণ)
+  for (let [fileUrl, sheetInfo] of sheetRowMap.entries()) {
+    const driveInfo = driveFileMap.get(fileUrl);
+    if (driveInfo) {
+      // ফাইল এখনও আছে – নাম বা সাবজেক্ট পরিবর্তন হয়েছে কিনা চেক
+      const subjectChanged = sheetInfo.subject !== driveInfo.subject;
+      const nameChanged = sheetInfo.cleanName !== driveInfo.cleanName;
+
+      if (subjectChanged || nameChanged) {
+        // আপডেট প্রয়োজন
+        const row = sheetInfo.rowIndex;
+        if (subjectChanged) {
+          sheet.getRange(row, 2).setValue(driveInfo.subject);
+        }
+        if (nameChanged) {
+          sheet.getRange(row, 4).setValue(driveInfo.cleanName);
+        }
+      }
+      // driveFileMap থেকে মুছে ফেলছি যাতে পরে শুধু নতুনগুলো অবশিষ্ট থাকে
+      driveFileMap.delete(fileUrl);
+    } else {
+      // ফাইল ড্রাইভে নেই – ডিলিট চিহ্নিত
+      rowsToDelete.add(sheetInfo.rowIndex);
+    }
+  }
+
+  // ডিলিট কার্যকর (নিচ থেকে উপরে)
+  const sortedRowsToDelete = Array.from(rowsToDelete).sort((a, b) => b - a);
+  for (let row of sortedRowsToDelete) {
+    sheet.deleteRow(row);
+  }
+
+  // অবশিষ্ট driveFileMap এন্ট্রিগুলো নতুন ফাইল – এগুলো অ্যাপেন্ড করতে হবে
+  for (let [fileUrl, driveInfo] of driveFileMap.entries()) {
+    // ফাইল অবজেক্ট পেতে DriveApp থেকে আবার ফেচ করতে হবে (তারিখের জন্য)
+    const file = DriveApp.getFileById(extractFileIdFromUrl_(fileUrl));
+    if (!file) continue; // সুরক্ষা
+
+    const dateCreated = file.getDateCreated();
+    const formattedDate = Utilities.formatDate(
+      dateCreated,
+      Session.getScriptTimeZone(),
+      "M/d/yyyy HH:mm:ss"
+    );
+
+    sheet.appendRow([
+      formattedDate,          // A: তারিখ
+      driveInfo.subject,      // B: সাবজেক্ট (সাথে ডকুমেন্ট)
+      fileUrl,                // C: লিংক
+      driveInfo.cleanName,    // D: পরিষ্কার নাম
+      '',                     // E
+      '',                     // F
+      folderId                // G: সোর্স ফোল্ডার আইডি
+    ]);
+  }
+
+  // চাহিদা ৪: ম্যানুয়াল ডেটা (যাদের G কলামে folderId নেই) সম্পূর্ণ untouched থাকবে
+}
+
+// ---------- হেল্পার ফাংশনসমূহ ----------
+
+// ফোল্ডার লিংক থেকে আইডি বের করা
+function extractFolderId_(url) {
+  const patterns = [
+    /\/folders\/([a-zA-Z0-9_-]+)/,
+    /id=([a-zA-Z0-9_-]+)/
+  ];
+  for (let pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+// ফাইল URL থেকে ফাইল আইডি বের করা (নতুন ফাইল যুক্ত করার সময় দরকার)
+function extractFileIdFromUrl_(url) {
+  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : null;
+}
+
+// শেষের নির্দিষ্ট প্রশিক্ষকের নাম কাটা
+function removeTrailingInstructor_(name) {
+  const lastHyphenIndex = name.lastIndexOf(' - ');
+  if (lastHyphenIndex === -1) return name;
+  
+  const suffix = name.substring(lastHyphenIndex + 3).trim();
+  const allowedSuffixes = [
+    'Bangladesh Online Madrasah',
+    'Sahibul Musa Sium',
+    'Sahibul Musa Siam',
+    'Riad Hasan'
+  ];
+  
+  if (allowedSuffixes.includes(suffix)) {
+    return name.substring(0, lastHyphenIndex).trim();
+  }
+  return name;
+}
+
+// ফাইল এক্সটেনশন বাদ দেওয়া
+function removeExtension_(filename) {
+  const lastDotIndex = filename.lastIndexOf('.');
+  if (lastDotIndex > 0) {
+    return filename.substring(0, lastDotIndex);
+  }
+  return filename;
+}
+
+// "Copy of " এবং একাধিক "Copy of " প্রিফিক্স মুছে ফেলা (চাহিদা ২)
+function removeCopyPrefix_(name) {
+  let cleaned = name.trim();
+  const prefix = "Copy of ";
+  while (cleaned.startsWith(prefix)) {
+    cleaned = cleaned.substring(prefix.length).trim();
+  }
+  return cleaned;
+}
+	</textarea>
     <div class="controls">
-      <button onclick="selectCode('code10')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+      <button onclick="selectCode('code23')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code23')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code23')">Download</button>
     </div>
   </section>
 
