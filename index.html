@@ -4999,25 +4999,435 @@ function removeCopyPrefix_(name) {
 
 			<!-- Code 10 -->
   <section class="snippet">
-    <h2>Code 20</h2>
-    <div class="subtitle">👉 titel লিখতে হবে</div>
-    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <h2>Code 24</h2>
+    <div class="subtitle">👉 RAS ITEM LIST APPSCRIPT</div>
+    <textarea id="code24" spellcheck="false" wrap="off">
+		/************************************
+ * RAS Fashion – Web App API
+ * Fetches product data from Google Sheet
+ * Compatible with doPost() / doGet()
+ ************************************/
+
+// ====== CONFIG ======
+const SPREADSHEET_ID = '17ZhMhM5DUZ45ucW8-C9_LEhLwLna1wMM8npEnfdjIVQ'; // ← আপনার Google Sheets ID দিন
+const SHEET_NAME = 'Sheet1';                // ← আপনার Sheet নাম
+
+// ====== UTIL ======
+function respondJson(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj, null, 2))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function isEmpty(v) {
+  return v === null || v === undefined || String(v).trim() === '';
+}
+
+function getHeaderIndices(headers) {
+  const indices = {};
+  // প্রতিটি ফিল্ডের সম্ভাব্য হেডার নাম (case-insensitive)
+  const headerMap = {
+    id:            ['id','Id','ID','productId','product_id'],
+    name:          ['name','Name','নাম','Product Name'],
+    nameEn:        ['nameEn','nameen','NameEn','English Name','name_en'],
+    price:         ['price','Price','মূল্য','দাম'],
+    originalPrice: ['originalPrice','originalprice','OriginalPrice','Original Price','original_price','মূল মূল্য'],
+    category:      ['category','Category','ক্যাটাগরি','cat'],
+    image:         ['image','Image','ছবি','Image URL','imageUrl','emoji','photo','img'],
+    desc:          ['desc','Desc','সংক্ষিপ্ত বিবরণ','Short Description','short_desc'],
+    tags:          ['tags','Tags','ট্যাগ','tag'],
+    badge:         ['badge','Badge','ব্যাজ'],
+    inStock:       ['inStock','instock','InStock','In Stock','স্টক','stock'],
+    description:   ['description','Description','বিস্তারিত','fullDescription','full_desc','details'],
+    specs:         ['specs','Specs','Specifications','স্পেসিফিকেশন','specification'],
+    company:       ['company','Company','কোম্পানি','brand','Brand'],
+    quality:       ['quality','Quality','কোয়ালিটি','grade'],
+    usage:         ['usage','Usage','ব্যবহার','how_to_use','uses'],
+    trending:      ['trending','Trending','ট্রেন্ডিং','isTrending'],
+    newArrival:    ['newArrival','newarrival','NewArrival','New Arrival','new_arrival','isNewArrival'],
+    deal:          ['deal','Deal','ডিল','isDeal','special_deal'],
+    bestseller:    ['bestseller','BestSeller','Best Seller','best_seller','বেস্টসেলার','isBestSeller'],
+    batch:         ['batch','Batch','ব্যাচ','Batch No','batch_no','batchNo']
+  };
+
+  for (let i = 0; i < headers.length; i++) {
+    const header = String(headers[i] || '').trim().toLowerCase();
+    for (const [key, aliases] of Object.entries(headerMap)) {
+      if (aliases.some(a => a.toLowerCase() === header)) {
+        indices[key] = i;
+        break;
+      }
+    }
+  }
+  console.log('Found header indices:', JSON.stringify(indices));
+  return indices;
+}
+
+function parseTags(val) {
+  if (isEmpty(val)) return [];
+  return String(val).split(',').map(t => t.trim()).filter(Boolean);
+}
+
+function parseBoolean(val) {
+  if (isEmpty(val)) return false;
+  const str = String(val).trim().toLowerCase();
+  return str === 'true' || str === 'yes' || str === '1' || str === 'হ্যাঁ' || str === '✓';
+}
+
+function parseSpecs(val) {
+  if (isEmpty(val)) return [];
+  return String(val).split('|').map(s => s.trim()).filter(Boolean);
+}
+
+// ====== CORE ======
+function fetchProducts(ssId, sheetName) {
+  try {
+    const ss = SpreadsheetApp.openById(ssId);
+    const sh = ss.getSheetByName(sheetName);
+    if (!sh) throw new Error('Sheet "' + sheetName + '" not found');
+
+    const dataRange = sh.getDataRange();
+    const values = dataRange.getValues();
+
+    console.log('Total rows found:', values.length);
+    if (values.length < 2) return [];
+
+    const headers = values[0];
+    const idx = getHeaderIndices(headers);
+
+    if (idx.id === undefined) {
+      throw new Error('Required header "id" not found. Available headers: ' + headers.join(', '));
+    }
+
+    const out = [];
+    for (let r = 1; r < values.length; r++) {
+      const row = values[r];
+      if (row.every(cell => isEmpty(cell))) continue;
+
+      const product = {
+        id:            String(row[idx.id] || '').trim(),
+        name:          String(row[idx.name] || '').trim(),
+        nameEn:        String(row[idx.nameEn] || '').trim(),
+        price:         Number(row[idx.price]) || 0,
+        originalPrice: row[idx.originalPrice] !== undefined ? (Number(row[idx.originalPrice]) || null) : null,
+        category:      String(row[idx.category] || 'Cosmetics').trim(),
+        image:         String(row[idx.image] || '').trim(),
+        emoji:         '', // backwards compatibility – set from image if needed
+        desc:          String(row[idx.desc] || '').trim(),
+        tags:          parseTags(row[idx.tags]),
+        badge:         String(row[idx.badge] || '').trim() || null,
+        inStock:       parseBoolean(row[idx.inStock]),
+        description:   String(row[idx.description] || '').trim(),
+        specs:         parseSpecs(row[idx.specs]),
+        company:       String(row[idx.company] || '').trim(),
+        quality:       String(row[idx.quality] || '').trim(),
+        usage:         String(row[idx.usage] || '').trim(),
+        trending:      parseBoolean(row[idx.trending]),
+        newArrival:    parseBoolean(row[idx.newArrival]),
+        deal:          parseBoolean(row[idx.deal]),
+        bestseller:    parseBoolean(row[idx.bestseller]),
+        batch:         idx.batch !== undefined ? (String(row[idx.batch] || '').trim() || null) : null,
+        _row:          r + 1
+      };
+
+      // Fallback emoji based on category
+      const emojiMap = { Cosmetics:'💄', Skincare:'🧴', Haircare:'💆', Fragrance:'🌸', Jewelry:'💍', Clothing:'👗' };
+      product.emoji = emojiMap[product.category] || '📦';
+
+      out.push(product);
+    }
+
+    console.log('Successfully processed', out.length, 'products');
+    return out;
+  } catch (error) {
+    console.error('Error in fetchProducts:', error);
+    throw error;
+  }
+}
+
+// ====== HTTP HANDLERS ======
+function doPost(e) {
+  try {
+    const products = fetchProducts(SPREADSHEET_ID, SHEET_NAME);
+    return respondJson({
+      ok: true,
+      count: products.length,
+      products: products,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('API Error:', err);
+    return respondJson({
+      ok: false,
+      error: err.message,
+      products: []
+    });
+  }
+}
+
+function doGet(e) {
+  return doPost(e);
+}
+	</textarea>
     <div class="controls">
-      <button onclick="selectCode('code10')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+      <button onclick="selectCode('code24')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code24')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code24')">Download</button>
     </div>
   </section>
 
 			<!-- Code 10 -->
   <section class="snippet">
-    <h2>Code 20</h2>
-    <div class="subtitle">👉 titel লিখতে হবে</div>
-    <textarea id="code10" spellcheck="false" wrap="off"><!-- এখানে Code 10 লিখুন --></textarea>
+    <h2>Code 25</h2>
+    <div class="subtitle">👉 RAS ORDER & ADMIN PANEL APPSCRIPT</div>
+    <textarea id="code25" spellcheck="false" wrap="off">
+		// ===================================
+// RAS Fashion - Google Apps Script API
+// Sheet ID: 1q0moC5pSbMeklWcS5yBAKdk3Rz36SoHIYCwU0Wft7tI
+// Sheet Name: Sheet1
+// ===================================
+
+const SPREADSHEET_ID = '1q0moC5pSbMeklWcS5yBAKdk3Rz36SoHIYCwU0Wft7tI';
+const SHEET_NAME = 'Sheet1';
+
+function forceText(val) {
+  if (val == null || val === '') return '';
+  return "'" + String(val);
+}
+
+function respondJson(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doGet(e) {
+  try {
+    const params = e ? e.parameter || {} : {};
+    const action = params.action || '';
+    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+    if (!sheet) throw new Error('Sheet not found');
+    
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+    const headers = values[0];
+    
+    if (values.length < 2) {
+      return respondJson({ ok: true, orders: [], count: 0 });
+    }
+    
+    // Map column indices (0-based)
+    const colMap = {};
+    headers.forEach((h, i) => { colMap[h] = i; });
+    
+    const orders = [];
+    for (let r = 1; r < values.length; r++) {
+      const row = values[r];
+      if (!row || row.every(c => !c)) continue;
+      
+      orders.push({
+        date: String(row[colMap['তারিখ'] ?? 0] || ''),
+        loginId: String(row[colMap['লগইন আইডি'] ?? 1] || ''),
+        orderId: String(row[colMap['অর্ডার আইডি'] ?? 2] || ''),
+        name: String(row[colMap['নাম'] ?? 3] || ''),
+        phone: String(row[colMap['ফোন'] ?? 4] || ''),
+        total: Number(row[colMap['মোট টাকা'] ?? 5]) || 0,
+        address: String(row[colMap['ঠিকানা'] ?? 6] || ''),
+        itemsSummary: String(row[colMap['আইটেম সামারি'] ?? 7] || ''),
+        statusReceived: String(row[colMap['অর্ডার রিসিভ'] ?? 8] || ''),
+        statusConfirmed: String(row[colMap['অর্ডার কনফার্ম'] ?? 9] || ''),
+        statusPackaging: String(row[colMap['প্যাকেজিং'] ?? 10] || ''),
+        statusShipped: String(row[colMap['প্রেরণ'] ?? 11] || ''),
+        statusDelivered: String(row[colMap['ডেলিভারি'] ?? 12] || ''),
+        deliveryPaymentMethod: String(row[colMap['ডেলিভারি পেমেন্ট মাধ্যম'] ?? 13] || ''),
+        deliveryAmount: Number(row[colMap['ডেলিভারি টাকা'] ?? 14]) || 0,
+        transactionId: String(row[colMap['ট্রানজেকশন আইডি'] ?? 15] || ''),
+        promoCode: String(row[colMap['প্রোমো কোড'] ?? 16] || ''),
+        promoDiscount: String(row[colMap['প্রোমো ডিসকাউন্ট'] ?? 17] || ''),
+        itemIds: String(row[colMap['আইটেম আইডি'] ?? 18] || ''),
+        batchNumbers: String(row[colMap['ব্যাচ নাম্বার'] ?? 19] || ''),
+        _row: r + 1
+      });
+    }
+    
+    let filtered = orders;
+    if (action === 'getOrdersByLoginId' && params.loginId) {
+      filtered = orders.filter(o => o.loginId === params.loginId);
+    } else if (action === 'getOrdersByPhone' && params.phone) {
+      filtered = orders.filter(o => o.phone === params.phone);
+    } else if (action === 'getOrderById' && params.orderId) {
+      filtered = orders.filter(o => o.orderId === params.orderId);
+    }
+    
+    filtered.sort((a, b) => b._row - a._row);
+    
+    filtered = filtered.map(order => {
+      let statusIndex = 0;
+      if (order.statusReceived && order.statusReceived.toString().toUpperCase() === 'DONE') {
+        if (order.statusConfirmed && order.statusConfirmed.toString().toUpperCase() === 'FALSE') {
+          statusIndex = -1; // Cancelled
+        } else if (order.statusConfirmed && order.statusConfirmed.toString().toUpperCase() === 'DONE') {
+          statusIndex = 1;
+          if (order.statusPackaging && order.statusPackaging.toString().toUpperCase() === 'DONE') {
+            statusIndex = 2;
+            if (order.statusShipped && order.statusShipped.toString().toUpperCase() === 'DONE') {
+              statusIndex = 3;
+              if (order.statusDelivered && order.statusDelivered.toString().toUpperCase() === 'DONE') {
+                statusIndex = 4;
+              }
+            }
+          }
+        }
+      }
+      return { ...order, statusIndex, cancelled: statusIndex === -1 };
+    });
+    
+    return respondJson({ ok: true, orders: filtered, count: filtered.length });
+    
+  } catch (err) {
+    return respondJson({ ok: false, error: err.message });
+  }
+}
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData ? e.postData.contents : '{}');
+    const action = data.action || '';
+    
+    if (action === 'placeOrder') {
+      const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+      if (!sheet) throw new Error('Sheet not found');
+      
+      const dataRange = sheet.getDataRange();
+      const values = dataRange.getValues();
+      
+      // If sheet is empty or has no headers, create headers
+      if (values.length === 0) {
+        sheet.appendRow([
+          'তারিখ', 'লগইন আইডি', 'অর্ডার আইডি', 'নাম', 'ফোন', 
+          'মোট টাকা', 'ঠিকানা', 'আইটেম সামারি',
+          'অর্ডার রিসিভ', 'অর্ডার কনফার্ম', 'প্যাকেজিং', 'প্রেরণ', 'ডেলিভারি',
+          'ডেলিভারি পেমেন্ট মাধ্যম', 'ডেলিভারি টাকা', 'ট্রানজেকশন আইডি',
+          'প্রোমো কোড', 'প্রোমো ডিসকাউন্ট', 'আইটেম আইডি', 'ব্যাচ নাম্বার'
+        ]);
+        // Set formats
+        sheet.getRange('E:E').setNumberFormat('@STRING@');   // Phone
+        sheet.getRange('P:P').setNumberFormat('@STRING@');   // Transaction ID
+        sheet.getRange('S:S').setNumberFormat('@STRING@');   // Item IDs
+        sheet.getRange('T:T').setNumberFormat('@STRING@');   // Batch Numbers
+      }
+      
+      // Ensure headers if missing columns
+      const colHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const requiredHeaders = [
+        'তারিখ', 'লগইন আইডি', 'অর্ডার আইডি', 'নাম', 'ফোন', 
+        'মোট টাকা', 'ঠিকানা', 'আইটেম সামারি',
+        'অর্ডার রিসিভ', 'অর্ডার কনফার্ম', 'প্যাকেজিং', 'প্রেরণ', 'ডেলিভারি',
+        'ডেলিভারি পেমেন্ট মাধ্যম', 'ডেলিভারি টাকা', 'ট্রানজেকশন আইডি',
+        'প্রোমো কোড', 'প্রোমো ডিসকাউন্ট', 'আইটেম আইডি', 'ব্যাচ নাম্বার'
+      ];
+      
+      const missing = [];
+      for (let i = 0; i < requiredHeaders.length; i++) {
+        if (!colHeaders[i] || colHeaders[i] !== requiredHeaders[i]) {
+          missing.push(i);
+        }
+      }
+      if (missing.length > 0) {
+        // Add missing headers
+        const lastCol = sheet.getLastColumn();
+        for (const idx of missing) {
+          if (idx >= lastCol) {
+            sheet.getRange(1, idx + 1).setValue(requiredHeaders[idx]);
+          } else {
+            sheet.getRange(1, idx + 1).setValue(requiredHeaders[idx]);
+          }
+        }
+      }
+      
+      const phoneStr = forceText(data.phone || '');
+      const transactionIdStr = forceText(data.transactionId || '');
+      const itemIdsStr = forceText(data.itemIds || '');
+      const batchNumsStr = forceText(data.batchNumbers || '');
+      
+      sheet.appendRow([
+        data.date || new Date().toLocaleDateString('bn-BD'),
+        data.loginId || '',
+        data.orderId || '',
+        data.name || '',
+        phoneStr,
+        data.total || 0,
+        data.address || '',
+        data.itemsSummary || '',
+        'DONE',                         // statusReceived
+        '',                             // statusConfirmed
+        '',                             // statusPackaging
+        '',                             // statusShipped
+        '',                             // statusDelivered
+        data.deliveryPaymentMethod || '',
+        data.deliveryAmount || 0,
+        transactionIdStr,
+        data.promoCode || '',
+        data.promoDiscount || '',
+        itemIdsStr,
+        batchNumsStr
+      ]);
+      
+      return respondJson({ ok: true, message: 'Order placed successfully', orderId: data.orderId });
+    }
+    
+    if (action === 'updateOrderStatus') {
+      const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+      if (!sheet) throw new Error('Sheet not found');
+      
+      const orderId = data.orderId;
+      const column = data.column; // 0-based index (9=confirm,10=packaging,etc.)
+      const value = data.value;
+      
+      const dataRange = sheet.getDataRange();
+      const values = dataRange.getValues();
+      const headers = values[0];
+      
+      // Find order column index (should be 2 for orderId based on current layout)
+      let orderIdCol = -1;
+      for (let i = 0; i < headers.length; i++) {
+        if (headers[i] === 'অর্ডার আইডি') {
+          orderIdCol = i;
+          break;
+        }
+      }
+      if (orderIdCol === -1) return respondJson({ ok: false, error: 'Order ID column not found' });
+      
+      let targetRow = -1;
+      for (let r = 1; r < values.length; r++) {
+        if (String(values[r][orderIdCol]) === orderId) {
+          targetRow = r + 1; // 1-based row
+          break;
+        }
+      }
+      if (targetRow === -1) return respondJson({ ok: false, error: 'Order not found' });
+      
+      // Ensure column exists (extend if necessary)
+      if (column >= headers.length) {
+        const missing = column - headers.length + 1;
+        for (let i = 0; i < missing; i++) {
+          sheet.getRange(1, headers.length + 1 + i).setValue('');
+        }
+      }
+      
+      sheet.getRange(targetRow, column + 1).setValue(value);
+      return respondJson({ ok: true, message: 'Status updated' });
+    }
+    
+    return respondJson({ ok: false, error: 'Unknown action' });
+    
+  } catch (err) {
+    return respondJson({ ok: false, error: err.message });
+  }
+}
+	</textarea>
     <div class="controls">
-      <button onclick="selectCode('code10')">Select All</button>
-      <button class="btn-blue" onclick="copyCode('code10')">Copy</button>
-      <button class="btn-green" onclick="downloadCode('code10')">Download</button>
+      <button onclick="selectCode('code25')">Select All</button>
+      <button class="btn-blue" onclick="copyCode('code25')">Copy</button>
+      <button class="btn-green" onclick="downloadCode('code25')">Download</button>
     </div>
   </section>
 
